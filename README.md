@@ -7,7 +7,7 @@ main window. It replaces a `ports.sh` script + web UI, and stays compatible with
 sharing the same label file.
 
 ```
- 🔌 3   ← menu bar: accent-tinted icon + count when ports are listening, dim when idle
+ 🔌 3   ← menu bar: filled plug + count when ports are listening, outline plug when idle
 
 ┌───────────────────────────────────────────────────────┐
 │ Ports                                    3 active     │
@@ -25,8 +25,9 @@ sharing the same label file.
 
 ## Features
 
-- **Menu bar only** (`LSUIElement`) — dim icon when nothing is listening, an icon tinted with
-  your system accent color plus a count badge when ports are active.
+- **Menu bar only** (`LSUIElement`) — an outline plug when nothing is listening, a filled plug
+  plus a count badge when ports are active. Both are template images, so macOS tints them
+  black or white to match the menu bar, the same as any built-in status item.
 - **Watch individual ports**, not a range — `3000`, `5432`, `8080` and `6379` can all be
   watched together without dragging in everything in between.
 - **Only active ports are listed.** Idle watched ports are still scanned and still keep their
