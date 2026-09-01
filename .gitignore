@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Xcode workspace/scheme noise we don't want tracked
+Ports.xcodeproj/project.xcworkspace/xcuserdata/
+Ports.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+Ports.xcodeproj/xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
