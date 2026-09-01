@@ -1,8 +1,21 @@
 import SwiftUI
 
+/// Propagates the measured height of the row stack up to the ScrollView.
+private struct ContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct PortListView: View {
     @ObservedObject var viewModel: PortsViewModel
     @Environment(\.openWindow) private var openWindow
+
+    /// Measured height of the row stack, used to size the ScrollView explicitly.
+    @State private var contentHeight: CGFloat = 0
+
+    private let maxListHeight: CGFloat = 360
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -76,7 +89,10 @@ struct PortListView: View {
 
     private var portList: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            // A plain VStack, not LazyVStack: the lazy variant only materializes rows that
+            // are already visible, so it reports zero height to the measurement below and
+            // the list can never size itself out of being empty.
+            VStack(spacing: 0) {
                 ForEach(Array(viewModel.rows.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Divider().padding(.leading, 12) }
 
@@ -90,9 +106,18 @@ struct PortListView: View {
                     )
                 }
             }
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+                }
+            )
         }
-        // Cap the height so a long watch list doesn't produce a popover taller than the screen.
-        .frame(maxHeight: 360)
+        .onPreferenceChange(ContentHeightKey.self) { contentHeight = $0 }
+        // An explicit height is required, not just a cap. A MenuBarExtra window proposes an
+        // unspecified height to its content, and a ScrollView given no definite height
+        // collapses to zero — which renders the whole list invisible. Measure the rows and
+        // size to them, capped so a long watch list can't outgrow the screen.
+        .frame(height: min(max(contentHeight, 1), maxListHeight))
     }
 
     private func errorBanner(_ message: String) -> some View {

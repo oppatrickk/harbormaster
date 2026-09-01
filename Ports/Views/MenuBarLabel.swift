@@ -39,7 +39,7 @@ enum MenuBarIconRenderer {
         let badge = HStack(spacing: 3) {
             Image(systemName: "powerplug.fill")
                 .font(.system(size: 13, weight: .medium))
-            Text("\(count)")
+            Text(verbatim: String(count))
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .monospacedDigit()
         }

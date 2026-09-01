@@ -42,7 +42,7 @@ struct PreferencesView: View {
             HStack {
                 Text("Watched Ports").font(.headline)
                 Spacer()
-                Text("\(preferences.watchedPorts.count) watched")
+                Text(verbatim: "\(preferences.watchedPorts.count) watched")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -93,7 +93,8 @@ struct PreferencesView: View {
                 VStack(spacing: 0) {
                     ForEach(preferences.watchedPorts, id: \.self) { port in
                         HStack {
-                            Text("\(port)")
+                            // verbatim: a Text literal would render port 3000 as "3,000".
+                            Text(verbatim: String(port))
                                 .font(.system(size: 12, design: .monospaced))
                             Spacer()
                             Button {

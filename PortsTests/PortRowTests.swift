@@ -139,4 +139,33 @@ struct PortRowTests {
         let rows = PortRow.rows(watching: [3000], listeners: [], labels: [:])
         #expect(rows[0].id == 3000)
     }
+
+    // MARK: - Display formatting
+
+    /// SwiftUI treats `Text("\(anInt)")` as a LocalizedStringKey and applies locale number
+    /// formatting, which rendered port 3000 as "3,000" and PID 61619 as "PID 61,619" in the
+    /// shipping UI. Ports and PIDs are identifiers and must never be group-separated.
+    @Test("Port text has no thousands separator", arguments: [
+        (80, "80"), (3000, "3000"), (5432, "5432"), (8080, "8080"), (65535, "65535"),
+    ])
+    func portTextIsUngrouped(port: Int, expected: String) {
+        let row = PortRow(port: port)
+
+        #expect(row.portText == expected)
+        #expect(!row.portText.contains(","))
+        #expect(!row.portText.contains("."))
+    }
+
+    @Test("PID text has no thousands separator")
+    func pidTextIsUngrouped() {
+        let row = PortRow(port: 3001, listener: listener(3001, 61619))
+
+        #expect(row.pidText == "PID 61619")
+        #expect(row.pidText?.contains(",") == false)
+    }
+
+    @Test("An idle row has no PID text")
+    func idleRowHasNoPIDText() {
+        #expect(PortRow(port: 3000).pidText == nil)
+    }
 }

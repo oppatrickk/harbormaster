@@ -30,7 +30,7 @@ struct PortRowView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text("\(row.port)")
+            Text(verbatim: row.portText)
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(row.isActive ? .primary : .secondary)
                 .frame(width: 44, alignment: .leading)
@@ -61,14 +61,14 @@ struct PortRowView: View {
 
     @ViewBuilder
     private var processColumn: some View {
-        if let processName = row.processName, let pid = row.pid {
+        if let processName = row.processName, let pidText = row.pidText {
             VStack(alignment: .leading, spacing: 2) {
-                Text(processName)
+                Text(verbatim: processName)
                     .font(.system(size: 12))
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                Text("PID \(pid)")
+                Text(verbatim: pidText)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
@@ -90,7 +90,7 @@ struct PortRowView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.red)
                     .controlSize(.small)
-                    .help("Send SIGKILL to PID \(row.pid.map(String.init) ?? "?")")
+                    .help(row.pidText.map { "Send SIGKILL to \($0)" } ?? "Send SIGKILL")
 
                 Button(action: onCancelKill) {
                     Image(systemName: "xmark")
@@ -103,7 +103,7 @@ struct PortRowView: View {
             Button("Kill", action: onRequestKill)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help("Kill \(row.processName ?? "process") on port \(row.port)")
+                .help("Kill \(row.processName ?? "process") on port " + row.portText)
         }
     }
 

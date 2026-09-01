@@ -17,6 +17,16 @@ struct PortRow: Identifiable, Hashable, Sendable {
     var processName: String? { listener?.processName }
     var pid: pid_t? { listener?.pid }
 
+    /// Display strings built with `String(_:)` rather than interpolated into a `Text` literal.
+    ///
+    /// SwiftUI treats `Text("\(someInt)")` as a LocalizedStringKey and applies locale number
+    /// formatting to it, which renders port 3000 as "3,000" and PID 61619 as "61,619".
+    /// Identifiers must never be group-separated, so the formatting happens here and the
+    /// views render it with `Text(verbatim:)`.
+    var portText: String { String(port) }
+
+    var pidText: String? { pid.map { "PID " + String($0) } }
+
     init(port: Int, listener: ListeningPort? = nil, label: String = "") {
         self.port = port
         self.listener = listener
