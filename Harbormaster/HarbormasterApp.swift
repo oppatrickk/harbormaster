@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct PortsApp: App {
+struct HarbormasterApp: App {
     static let preferencesWindowID = "preferences"
 
     @StateObject private var viewModel = PortsViewModel()

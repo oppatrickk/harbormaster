@@ -1,6 +1,9 @@
-# Ports
+# Harbormaster
 
 A macOS menu bar app for watching and killing the TCP ports your dev servers are sitting on.
+
+A harbormaster assigns berths and can order a vessel out. Same idea: see what's docked on your
+dev ports, and evict it.
 
 Native Swift + SwiftUI (`MenuBarExtra`, macOS 13+). No Electron, no Tauri, no dock icon, no
 main window. It replaces a `ports.sh` script + web UI, and stays compatible with the script by
@@ -10,7 +13,7 @@ sharing the same label file.
  🔌 3   ← menu bar: filled plug + count when ports are listening, outline plug when idle
 
 ┌───────────────────────────────────────────────────────┐
-│ Ports                                    3 active     │
+│ Ports                                        3 active │
 ├───────────────────────────────────────────────────────┤
 │ 3001   node          [ storefront   ]        [Kill]   │
 │        PID 61619                                      │
@@ -47,19 +50,19 @@ sharing the same label file.
 ## Build and run
 
 ```bash
-git clone https://github.com/oppatrickk/portside.git
-cd portside
+git clone https://github.com/oppatrickk/harbormaster.git
+cd harbormaster
 
 # Build
-xcodebuild build -project Ports.xcodeproj -scheme Ports -configuration Release
+xcodebuild build -project Harbormaster.xcodeproj -scheme Harbormaster -configuration Release
 
 # Run it from the build directory
-open "$(xcodebuild -project Ports.xcodeproj -scheme Ports -configuration Release \
+open "$(xcodebuild -project Harbormaster.xcodeproj -scheme Harbormaster -configuration Release \
         -showBuildSettings 2>/dev/null \
-        | awk -F' = ' '/ BUILT_PRODUCTS_DIR/ {print $2}')/Ports.app"
+        | awk -F' = ' '/ BUILT_PRODUCTS_DIR/ {print $2}')/Harbormaster.app"
 ```
 
-Or just open `Ports.xcodeproj` in Xcode and hit Run.
+Or just open `Harbormaster.xcodeproj` in Xcode and hit Run.
 
 Nothing appears in the Dock — look for the plug icon in the menu bar.
 
@@ -68,16 +71,16 @@ Nothing appears in the Dock — look for the plug icon in the menu bar.
 Recommended, and **required** for launch-at-login to work reliably:
 
 ```bash
-xcodebuild build -project Ports.xcodeproj -scheme Ports -configuration Release \
+xcodebuild build -project Harbormaster.xcodeproj -scheme Harbormaster -configuration Release \
   -derivedDataPath ./build
-cp -R ./build/Build/Products/Release/Ports.app /Applications/
-open /Applications/Ports.app
+cp -R ./build/Build/Products/Release/Harbormaster.app /Applications/
+open /Applications/Harbormaster.app
 ```
 
 ### Run the tests
 
 ```bash
-xcodebuild test -project Ports.xcodeproj -scheme Ports
+xcodebuild test -project Harbormaster.xcodeproj -scheme Harbormaster
 ```
 
 94 tests across 5 suites covering the `lsof` parsers, the row model, the settings store, and
@@ -116,7 +119,7 @@ inconsistent about it. If the toggle throws an error:
    `DerivedData`.
 2. Check **System Settings → General → Login Items**; macOS may be waiting on your approval.
 3. If you do have a Developer ID certificate, set `DEVELOPMENT_TEAM` and
-   `CODE_SIGN_IDENTITY` on the `Ports` target and it becomes reliable.
+   `CODE_SIGN_IDENTITY` on the `Harbormaster` target and it becomes reliable.
 
 Any failure is shown inline in Preferences rather than silently flipping the toggle back.
 
@@ -192,8 +195,8 @@ signals an entire process group and `kill(-1, …)` signals everything you own.
 ## Project layout
 
 ```
-Ports/
-  PortsApp.swift          @main — MenuBarExtra + Preferences window scenes
+Harbormaster/
+  HarbormasterApp.swift   @main — MenuBarExtra + Preferences window scenes
   PortsViewModel.swift    refresh loop, orchestration (@MainActor)
   Core/                   no UI imports — this is the tested layer
     ListeningPort.swift   a socket found in LISTEN state
@@ -209,7 +212,7 @@ Ports/
     PortListView.swift
     PortRowView.swift
     PreferencesView.swift
-PortsTests/
+HarbormasterTests/
   PortScannerParsingTests.swift
   PortRowTests.swift
   PreferencesTests.swift

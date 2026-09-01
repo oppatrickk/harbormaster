@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import Ports
+@testable import Harbormaster
 
 /// The on-disk format is a compatibility contract with the existing `ports.sh` script,
 /// so these tests assert on exact file bytes, not just round-tripping.

@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "AA0000000000000000000020"
-               BuildableName = "Ports.app"
-               BlueprintName = "Ports"
-               ReferencedContainer = "container:Ports.xcodeproj">
+               BuildableName = "Harbormaster.app"
+               BlueprintName = "Harbormaster"
+               ReferencedContainer = "container:Harbormaster.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "AA0000000000000000000030"
-               BuildableName = "PortsTests.xctest"
-               BlueprintName = "PortsTests"
-               ReferencedContainer = "container:Ports.xcodeproj">
+               BuildableName = "HarbormasterTests.xctest"
+               BlueprintName = "HarbormasterTests"
+               ReferencedContainer = "container:Harbormaster.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA0000000000000000000020"
-            BuildableName = "Ports.app"
-            BlueprintName = "Ports"
-            ReferencedContainer = "container:Ports.xcodeproj">
+            BuildableName = "Harbormaster.app"
+            BlueprintName = "Harbormaster"
+            ReferencedContainer = "container:Harbormaster.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA0000000000000000000020"
-            BuildableName = "Ports.app"
-            BlueprintName = "Ports"
-            ReferencedContainer = "container:Ports.xcodeproj">
+            BuildableName = "Harbormaster.app"
+            BlueprintName = "Harbormaster"
+            ReferencedContainer = "container:Harbormaster.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

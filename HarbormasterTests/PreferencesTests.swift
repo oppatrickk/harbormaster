@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import Ports
+@testable import Harbormaster
 
 @MainActor
 struct PreferencesTests {
@@ -147,7 +147,7 @@ struct PreferencesTests {
         #expect(preferences.watchedPorts == [3000, 3001, 3002])
     }
 
-    /// `defaults write com.oppatrickk.Ports watchedPorts -array 3000 3001` stores *strings*.
+    /// `defaults write com.oppatrickk.Harbormaster watchedPorts -array 3000 3001` stores *strings*.
     /// A plain `as? [Int]` cast fails on that, which would silently reset a hand-edited
     /// watch list back to the defaults.
     @Test("String-encoded ports from `defaults write -array` are accepted")

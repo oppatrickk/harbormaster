@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import Ports
+@testable import Harbormaster
 
 /// Rows are built for *every* watched port, not just the ones in use, so idle ports stay
 /// visible and labelable.

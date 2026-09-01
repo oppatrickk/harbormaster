@@ -173,7 +173,7 @@ struct PortListView: View {
     }
 
     private func openPreferences() {
-        openWindow(id: PortsApp.preferencesWindowID)
+        openWindow(id: HarbormasterApp.preferencesWindowID)
         // LSUIElement apps aren't active, so the new window opens behind everything.
         NSApp.activate(ignoringOtherApps: true)
     }

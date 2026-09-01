@@ -13,7 +13,7 @@ final class LabelStore: @unchecked Sendable {
         .appendingPathComponent(".ports_labels.tsv")
 
     private let url: URL
-    private let queue = DispatchQueue(label: "com.oppatrickk.Ports.LabelStore")
+    private let queue = DispatchQueue(label: "com.oppatrickk.Harbormaster.LabelStore")
 
     init(url: URL = LabelStore.defaultURL) {
         self.url = url

@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import Ports
+@testable import Harbormaster
 
 /// Fixtures below are verbatim captures of `lsof -nP -iTCP -sTCP:LISTEN -F pcn +c 0`
 /// on macOS 26.6 / lsof 4.91 — not hand-written approximations.

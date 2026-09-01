@@ -203,7 +203,7 @@ struct PreferencesView: View {
                 } catch {
                     loginItemError = "Could not \(desired ? "enable" : "disable") "
                         + "launch at login: \(error.localizedDescription) "
-                        + "Try moving Ports.app to /Applications and relaunching it."
+                        + "Try moving Harbormaster.app to /Applications and relaunching it."
                 }
                 launchAtLogin = LoginItem.isEnabled
             }

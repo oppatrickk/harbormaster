@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import Ports
+@testable import Harbormaster
 
 /// Auto-detected labels come from each process's working directory. Fixtures are verbatim
 /// captures of `lsof -a -p <pids> -d cwd -F pn` on macOS.
