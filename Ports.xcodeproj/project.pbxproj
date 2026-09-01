@@ -21,6 +21,9 @@
 		AA000000000000000000020C /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010C /* PreferencesView.swift */; };
 		AA000000000000000000020D /* PortScannerParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010D /* PortScannerParsingTests.swift */; };
 		AA000000000000000000020E /* LabelStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010E /* LabelStoreTests.swift */; };
+		AA000000000000000000020F /* PortRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010F /* PortRow.swift */; };
+		AA0000000000000000000210 /* PortRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000110 /* PortRowTests.swift */; };
+		AA0000000000000000000211 /* PreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000111 /* PreferencesTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +53,9 @@
 		AA000000000000000000010C /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		AA000000000000000000010D /* PortScannerParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortScannerParsingTests.swift; sourceTree = "<group>"; };
 		AA000000000000000000010E /* LabelStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelStoreTests.swift; sourceTree = "<group>"; };
+		AA000000000000000000010F /* PortRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortRow.swift; sourceTree = "<group>"; };
+		AA0000000000000000000110 /* PortRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortRowTests.swift; sourceTree = "<group>"; };
+		AA0000000000000000000111 /* PreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -103,6 +109,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0000000000000000000103 /* ListeningPort.swift */,
+				AA000000000000000000010F /* PortRow.swift */,
 				AA0000000000000000000104 /* PortScanner.swift */,
 				AA0000000000000000000105 /* LabelStore.swift */,
 				AA0000000000000000000106 /* ProcessKiller.swift */,
@@ -128,6 +135,8 @@
 			children = (
 				AA000000000000000000010D /* PortScannerParsingTests.swift */,
 				AA000000000000000000010E /* LabelStoreTests.swift */,
+				AA0000000000000000000110 /* PortRowTests.swift */,
+				AA0000000000000000000111 /* PreferencesTests.swift */,
 			);
 			path = PortsTests;
 			sourceTree = "<group>";
@@ -231,6 +240,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA0000000000000000000203 /* ListeningPort.swift in Sources */,
+				AA000000000000000000020F /* PortRow.swift in Sources */,
 				AA0000000000000000000204 /* PortScanner.swift in Sources */,
 				AA0000000000000000000205 /* LabelStore.swift in Sources */,
 				AA0000000000000000000206 /* ProcessKiller.swift in Sources */,
@@ -251,6 +261,8 @@
 			files = (
 				AA000000000000000000020D /* PortScannerParsingTests.swift in Sources */,
 				AA000000000000000000020E /* LabelStoreTests.swift in Sources */,
+				AA0000000000000000000210 /* PortRowTests.swift in Sources */,
+				AA0000000000000000000211 /* PreferencesTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -359,6 +371,7 @@
 				CODE_SIGN_STYLE = Manual;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oppatrickk.PortsTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -375,6 +388,7 @@
 				CODE_SIGN_STYLE = Manual;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.oppatrickk.PortsTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

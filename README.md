@@ -7,31 +7,37 @@ main window. It replaces a `ports.sh` script + web UI, and stays compatible with
 sharing the same label file.
 
 ```
- 🔌 3   ← menu bar: amber icon + count when ports are listening, dim when idle
+ 🔌 3   ← menu bar: accent-tinted icon + count when ports are listening, dim when idle
 
-┌─────────────────────────────────────────────────────┐
-│ Ports 3000–3010                     3 ports active  │
-├─────────────────────────────────────────────────────┤
-│ 3001   node          [ storefront    ]      [Kill]  │
-│        PID 61619                                    │
-│ 3002   node          [ admin-api     ]      [Kill]  │
-│        PID 63934                                    │
-│ 3005   node          [              ]       [Kill]  │
-│        PID 71798                                    │
-├─────────────────────────────────────────────────────┤
-│ ↻ Refresh   ⚙ Preferences                    Quit   │
-└─────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│ Ports                              3 of 5 active      │
+├───────────────────────────────────────────────────────┤
+│ 3000   free          [ reserved     ]                 │
+│ 3001   node          [ storefront   ]        [Kill]   │
+│        PID 61619                                      │
+│ 3002   node          [ admin-api    ]        [Kill]   │
+│        PID 63934                                      │
+│ 5432   postgres      [ db           ]        [Kill]   │
+│        PID 9041                                       │
+│ 8080   free          [             ]                  │
+├───────────────────────────────────────────────────────┤
+│ ↻ Refresh   ⚙ Preferences                      Quit   │
+└───────────────────────────────────────────────────────┘
 ```
 
 ## Features
 
-- **Menu bar only** (`LSUIElement`) — dim icon when nothing is listening, amber icon with a
-  count badge when ports are active.
-- **One row per listening port** — port number, process name, PID.
-- **Inline labels** — click the text field, type, press Enter or click away to save.
-- **Kill** — SIGKILL with an inline two-step confirmation.
+- **Menu bar only** (`LSUIElement`) — dim icon when nothing is listening, an icon tinted with
+  your system accent color plus a count badge when ports are active.
+- **Watch individual ports**, not a range — `3000`, `5432`, `8080` and `6379` can all be
+  watched together without dragging in everything in between.
+- **Every watched port gets a row**, in use or not. Idle ports show as `free` rather than
+  vanishing from the list, so you can see and label your whole set at a glance.
+- **Inline labels** — click the text field, type, press Enter or click away to save. Idle
+  ports can be labeled too.
+- **Kill** — SIGKILL with an inline two-step confirmation. Only offered on active ports.
 - **Auto-refresh** on a timer (default 3s), plus manual refresh (`⌘R`).
-- **Preferences** (`⌘,`) — port range, refresh interval, launch at login.
+- **Preferences** (`⌘,`) — add/remove watched ports, refresh interval, launch at login.
 
 ## Requirements
 
@@ -74,8 +80,20 @@ open /Applications/Ports.app
 xcodebuild test -project Ports.xcodeproj -scheme Ports
 ```
 
-34 tests covering the `lsof` output parser and the label file format. Neither touches the real
-`~/.ports_labels.tsv` — the label tests run against a temp directory.
+68 tests across 4 suites covering the `lsof` parser, the row model, the settings store, and
+the label file format. None of them touch your real `~/.ports_labels.tsv` or app settings —
+the label tests use a temp directory and the settings tests use an isolated UserDefaults suite.
+
+## Choosing which ports to watch
+
+Preferences → **Watched Ports**. Type a port, press Enter or click Add. Click the ⊖ next to a
+port to stop watching it.
+
+Ports are watched individually and don't have to be consecutive. A fresh install watches
+3000–3010 (as eleven individual entries), which you can prune or extend.
+
+If you're upgrading from a version that stored a contiguous range, that range is migrated into
+the individual ports it covered, so nothing changes out from under you.
 
 ## Launch at login
 
@@ -106,7 +124,7 @@ Labels live in `~/.ports_labels.tsv`, tab-separated, one line per labeled port:
 ```
 3000	api
 3001	storefront
-3005	worker-queue
+5432	db
 ```
 
 This is the same file `ports.sh` uses, and both tools can be used interchangeably:
@@ -121,22 +139,33 @@ This is the same file `ports.sh` uses, and both tools can be used interchangeabl
 
 Edit the file by hand and the app picks it up on the next refresh.
 
+> **Note:** killing a port deletes its label line, per the original `ports.sh` contract. Now
+> that idle ports stay visible, you may prefer labels to survive a kill so a restarted server
+> keeps its name. That's a one-line change — drop the `removeLabel` call in
+> `PortsViewModel.confirmKill`.
+
 ## How ports are discovered
 
-One `lsof` call per refresh over the whole range:
+One `lsof` call per refresh, with one `-i` flag per watched port:
 
 ```
-/usr/sbin/lsof -nP -iTCP:3000-3010 -sTCP:LISTEN -F pcn +c 0
+/usr/sbin/lsof -nP -iTCP:3000 -iTCP:3001 -iTCP:5432 -sTCP:LISTEN -F pcn +c 0
 ```
 
-A few details that the implementation depends on, all of which are covered by tests:
+A few details the implementation depends on, all verified against lsof 4.91 and covered by
+tests:
 
+- **Multiple `-i` flags are OR'd**, so one call covers the whole watch list however
+  non-contiguous it is.
+- **`lsof` exits 1 if *any* search term matched nothing — even when other terms returned
+  data.** With one flag per port, a single idle port in your list produces exit 1 alongside
+  perfectly good output. Treating exit 1 as failure would break the normal case entirely.
+- **With no `-i` flag at all, `lsof` lists every open file on the system** (~30k lines). An
+  empty watch list therefore short-circuits and never reaches the process spawn.
 - **`-F pcn` (field output), not the column output.** The default `COMMAND` column truncates to
   9 characters, turning `language_server_macos_arm` into `language_`. `+c 0` lifts the limit.
 - **Field output is stateful.** A `p<pid>` line opens a process block and `c<command>` names it;
   *several* `f<fd>`/`n<address>` pairs can follow, all belonging to that process.
-- **`lsof` exits 1 when it finds nothing.** That's the normal case for a quiet range, not an
-  error — treating it as one would show a permanent failure whenever no dev servers are up.
 - **Duplicate rows get collapsed.** A process listening on both IPv4 and IPv6 reports the same
   port on multiple descriptors; results are deduped on `(port, pid)`.
 - **Three address shapes** are parsed: `[::1]:3001`, `*:63942`, `127.0.0.1:5037`.
@@ -152,12 +181,13 @@ Ports/
   PortsApp.swift          @main — MenuBarExtra + Preferences window scenes
   PortsViewModel.swift    refresh loop, orchestration (@MainActor)
   Core/                   no UI imports — this is the tested layer
-    ListeningPort.swift
+    ListeningPort.swift   a socket found in LISTEN state
+    PortRow.swift         a watched port + its listener (if any) + label
     PortScanner.swift     lsof invocation + parsing
     LabelStore.swift      ~/.ports_labels.tsv read/write
     ProcessKiller.swift
     LoginItem.swift       SMAppService wrapper
-    Preferences.swift
+    Preferences.swift     watched ports, interval, migration
   Views/
     MenuBarLabel.swift    status item icon + count badge
     PortListView.swift
@@ -165,12 +195,14 @@ Ports/
     PreferencesView.swift
 PortsTests/
   PortScannerParsingTests.swift
+  PortRowTests.swift
+  PreferencesTests.swift
   LabelStoreTests.swift
 ```
 
-`Core/` has no SwiftUI/AppKit dependency. `PortScanner` takes a `CommandRunner` and
-`LabelStore` takes a file URL, so both are testable without spawning `lsof` or touching your
-home directory.
+`Core/` has no SwiftUI/AppKit dependency. `PortScanner` takes a `CommandRunner`, `LabelStore`
+takes a file URL, and `Preferences` takes a `UserDefaults`, so all three are testable without
+spawning `lsof` or touching your home directory.
 
 ## Notes and non-goals
 

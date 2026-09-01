@@ -75,36 +75,45 @@ enum PortScannerError: Error, LocalizedError {
 enum PortScanner {
     static let lsofPath = "/usr/sbin/lsof"
 
-    /// Scans `range` for listening TCP sockets.
+    /// Scans a specific set of ports for listening TCP sockets.
+    ///
+    /// Each port gets its own `-iTCP:<port>` flag; lsof ORs them together, so one call covers
+    /// the whole watch list however non-contiguous it is.
     ///
     /// Uses `lsof`'s field output (`-F pcn`) rather than the human-readable columns: the
     /// default `COMMAND` column is truncated to 9 characters, which mangles names like
     /// `language_server_macos_arm`. `+c 0` lifts that limit.
     static func scan(
-        range: ClosedRange<Int>,
+        ports: [Int],
         runner: CommandRunner = SystemCommandRunner()
     ) throws -> [ListeningPort] {
-        let spec = range.lowerBound == range.upperBound
-            ? "\(range.lowerBound)"
-            : "\(range.lowerBound)-\(range.upperBound)"
+        let wanted = Set(ports.filter { validPorts.contains($0) })
 
-        let result = try runner.run(lsofPath, [
-            "-nP",                  // no DNS / no port-name lookup
-            "-iTCP:\(spec)",
+        // Critical: with no -i flag at all, lsof lists every open file on the system —
+        // ~30k lines. An empty watch list must never reach the process spawn.
+        guard !wanted.isEmpty else { return [] }
+
+        var arguments = ["-nP"]                             // no DNS / no port-name lookup
+        arguments += wanted.sorted().map { "-iTCP:\($0)" }  // OR'd together by lsof
+        arguments += [
             "-sTCP:LISTEN",
             "-F", "pcn",            // machine-readable: pid, command, name
             "+c", "0",              // don't truncate command names
-        ])
+        ]
 
-        // lsof exits 1 when it simply found nothing — the common case for a quiet range.
-        // Treating that as an error would surface a permanent failure whenever no dev
-        // servers are running.
+        let result = try runner.run(lsofPath, arguments)
+
+        // lsof exits 1 when *any* search term matched nothing — so with one -i per port,
+        // a single idle port in the list produces exit 1 even though other ports returned
+        // data. Treating that as an error would break the normal case entirely.
         guard result.exitCode == 0 || result.exitCode == 1 else {
             throw PortScannerError.lsofFailed(exitCode: result.exitCode, stderr: result.stderr)
         }
 
-        return parse(fieldOutput: result.stdout, in: range)
+        return parse(fieldOutput: result.stdout, allowedPorts: wanted)
     }
+
+    static let validPorts = 1...65535
 
     /// Parses `lsof -F pcn` output. Pure — this is the unit-tested core.
     ///
@@ -118,7 +127,7 @@ enum PortScanner {
     ///     n*:63942
     ///     f11
     ///     n*:63942      <- same process, same port, second file descriptor
-    static func parse(fieldOutput: String, in range: ClosedRange<Int>) -> [ListeningPort] {
+    static func parse(fieldOutput: String, allowedPorts: Set<Int>) -> [ListeningPort] {
         var results: [ListeningPort] = []
         var seen = Set<String>()
         var currentPID: pid_t?
@@ -139,7 +148,7 @@ enum PortScanner {
             case "n":
                 guard let pid = currentPID,
                       let port = port(fromAddress: value),
-                      range.contains(port)
+                      allowedPorts.contains(port)
                 else { continue }
 
                 // A process listening on both IPv4 and IPv6 yields one entry per socket.
@@ -155,6 +164,11 @@ enum PortScanner {
         return results.sorted {
             ($0.port, $0.pid) < ($1.port, $1.pid)
         }
+    }
+
+    /// Convenience for contiguous spans — mainly useful in tests.
+    static func parse(fieldOutput: String, in range: ClosedRange<Int>) -> [ListeningPort] {
+        parse(fieldOutput: fieldOutput, allowedPorts: Set(range))
     }
 
     /// Extracts the port from an `lsof` address.

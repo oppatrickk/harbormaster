@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PortRowView: View {
-    let port: ListeningPort
+    let row: PortRow
     let isConfirmingKill: Bool
     let onCommitLabel: (String) -> Void
     let onRequestKill: () -> Void
@@ -12,39 +12,31 @@ struct PortRowView: View {
     @FocusState private var isLabelFocused: Bool
 
     init(
-        port: ListeningPort,
+        row: PortRow,
         isConfirmingKill: Bool,
         onCommitLabel: @escaping (String) -> Void,
         onRequestKill: @escaping () -> Void,
         onConfirmKill: @escaping () -> Void,
         onCancelKill: @escaping () -> Void
     ) {
-        self.port = port
+        self.row = row
         self.isConfirmingKill = isConfirmingKill
         self.onCommitLabel = onCommitLabel
         self.onRequestKill = onRequestKill
         self.onConfirmKill = onConfirmKill
         self.onCancelKill = onCancelKill
-        _draftLabel = State(initialValue: port.label)
+        _draftLabel = State(initialValue: row.label)
     }
 
     var body: some View {
         HStack(spacing: 10) {
-            Text("\(port.port)")
+            Text("\(row.port)")
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundStyle(row.isActive ? .primary : .secondary)
                 .frame(width: 44, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(port.processName)
-                    .font(.system(size: 12))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Text("PID \(port.pid)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(width: 110, alignment: .leading)
+            processColumn
+                .frame(width: 110, alignment: .leading)
 
             TextField("Label", text: $draftLabel)
                 .textFieldStyle(.roundedBorder)
@@ -57,24 +49,48 @@ struct PortRowView: View {
                 }
 
             killControl
+                .frame(width: 74, alignment: .trailing)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .onChange(of: port.label) { newValue in
+        .onChange(of: row.label) { newValue in
             // Pick up out-of-band edits (ports.sh writing the TSV) without stomping typing.
             if !isLabelFocused { draftLabel = newValue }
         }
     }
 
     @ViewBuilder
+    private var processColumn: some View {
+        if let processName = row.processName, let pid = row.pid {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(processName)
+                    .font(.system(size: 12))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Text("PID \(pid)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Text("free")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    @ViewBuilder
     private var killControl: some View {
-        if isConfirmingKill {
+        if !row.isActive {
+            // Nothing to kill on a free port; the space stays reserved so rows stay aligned.
+            Color.clear.frame(height: 1)
+        } else if isConfirmingKill {
             HStack(spacing: 4) {
                 Button("Kill", action: onConfirmKill)
                     .buttonStyle(.borderedProminent)
                     .tint(.red)
                     .controlSize(.small)
-                    .help("Send SIGKILL to PID \(port.pid)")
+                    .help("Send SIGKILL to PID \(row.pid.map(String.init) ?? "?")")
 
                 Button(action: onCancelKill) {
                     Image(systemName: "xmark")
@@ -87,7 +103,7 @@ struct PortRowView: View {
             Button("Kill", action: onRequestKill)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help("Kill \(port.processName) on port \(port.port)")
+                .help("Kill \(row.processName ?? "process") on port \(row.port)")
         }
     }
 

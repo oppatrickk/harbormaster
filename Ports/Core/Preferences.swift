@@ -7,29 +7,27 @@ final class Preferences: ObservableObject {
     static let shared = Preferences()
 
     enum Default {
-        static let portRangeStart = 3000
-        static let portRangeEnd = 3010
+        /// Ports watched on first launch, listed individually.
+        static let watchedPorts = Array(3000...3010)
         static let refreshInterval: Double = 3
     }
 
     private enum Key {
-        static let portRangeStart = "portRangeStart"
-        static let portRangeEnd = "portRangeEnd"
+        static let watchedPorts = "watchedPorts"
         static let refreshInterval = "refreshInterval"
+        // Pre-individual-ports keys, read once to migrate then left alone.
+        static let legacyRangeStart = "portRangeStart"
+        static let legacyRangeEnd = "portRangeEnd"
     }
 
-    /// Sane bounds so a typo can't spawn an lsof scan over all 65k ports every 3 seconds.
     static let portBounds = 1...65535
     static let intervalBounds = 1.0...60.0
 
     private let defaults: UserDefaults
 
-    @Published var portRangeStart: Int {
-        didSet { defaults.set(portRangeStart, forKey: Key.portRangeStart) }
-    }
-
-    @Published var portRangeEnd: Int {
-        didSet { defaults.set(portRangeEnd, forKey: Key.portRangeEnd) }
+    /// Always sorted, deduplicated, and in-bounds — enforced by `normalize`.
+    @Published private(set) var watchedPorts: [Int] {
+        didSet { defaults.set(watchedPorts, forKey: Key.watchedPorts) }
     }
 
     @Published var refreshInterval: Double {
@@ -38,19 +36,37 @@ final class Preferences: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        portRangeStart = defaults.object(forKey: Key.portRangeStart) as? Int
-            ?? Default.portRangeStart
-        portRangeEnd = defaults.object(forKey: Key.portRangeEnd) as? Int
-            ?? Default.portRangeEnd
+
+        // An explicitly stored list always wins, even when empty — "watch nothing" is a
+        // legitimate choice and must not silently spring back to the defaults.
+        if let stored = Self.decodeStoredPorts(defaults.object(forKey: Key.watchedPorts)) {
+            watchedPorts = Self.normalize(stored)
+        } else if let start = defaults.object(forKey: Key.legacyRangeStart) as? Int,
+                  let end = defaults.object(forKey: Key.legacyRangeEnd) as? Int {
+            // Migrate an older contiguous range into the individual ports it covered, so
+            // upgrading doesn't silently change which ports are watched.
+            watchedPorts = Self.normalize(Array(min(start, end)...max(start, end)))
+        } else {
+            watchedPorts = Self.normalize(Default.watchedPorts)
+        }
+
         refreshInterval = defaults.object(forKey: Key.refreshInterval) as? Double
             ?? Default.refreshInterval
     }
 
-    /// Always a valid range, whatever order the two fields were typed in.
-    var portRange: ClosedRange<Int> {
-        let low = portRangeStart.clamped(to: Self.portBounds)
-        let high = portRangeEnd.clamped(to: Self.portBounds)
-        return min(low, high)...max(low, high)
+    // MARK: - Watched ports
+
+    /// Adds a port. Returns false if it's out of bounds or already watched.
+    @discardableResult
+    func addPort(_ port: Int) -> Bool {
+        guard Self.portBounds.contains(port), !watchedPorts.contains(port) else { return false }
+        watchedPorts = Self.normalize(watchedPorts + [port])
+        return true
+    }
+
+    func removePort(_ port: Int) {
+        guard watchedPorts.contains(port) else { return }
+        watchedPorts = watchedPorts.filter { $0 != port }
     }
 
     var effectiveRefreshInterval: Double {
@@ -58,9 +74,33 @@ final class Preferences: ObservableObject {
     }
 
     func resetToDefaults() {
-        portRangeStart = Default.portRangeStart
-        portRangeEnd = Default.portRangeEnd
+        watchedPorts = Self.normalize(Default.watchedPorts)
         refreshInterval = Default.refreshInterval
+    }
+
+    private static func normalize(_ ports: [Int]) -> [Int] {
+        Array(Set(ports.filter { portBounds.contains($0) })).sorted()
+    }
+
+    /// Coerces a stored value into port numbers, tolerating the several shapes a plist can
+    /// legitimately hold.
+    ///
+    /// `defaults write … -array 3000 3001` stores *strings*, not integers, so a plain
+    /// `as? [Int]` cast fails and would silently discard a hand-edited watch list. Unparseable
+    /// entries are dropped individually rather than throwing the whole list away.
+    ///
+    /// Returns nil only when the key is absent or isn't an array at all — that's the signal
+    /// to fall through to migration or defaults.
+    private static func decodeStoredPorts(_ raw: Any?) -> [Int]? {
+        guard let elements = raw as? [Any] else { return nil }
+
+        return elements.compactMap { element in
+            if let number = element as? NSNumber { return number.intValue }
+            if let text = element as? String {
+                return Int(text.trimmingCharacters(in: .whitespaces))
+            }
+            return nil
+        }
     }
 }
 

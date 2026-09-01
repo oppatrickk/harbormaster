@@ -9,7 +9,7 @@ struct PortListView: View {
             header
             Divider()
 
-            if viewModel.ports.isEmpty {
+            if viewModel.rows.isEmpty {
                 emptyState
             } else {
                 portList
@@ -23,7 +23,7 @@ struct PortListView: View {
             Divider()
             footer
         }
-        .frame(width: 380)
+        .frame(width: 400)
     }
 
     // MARK: - Sections
@@ -31,14 +31,14 @@ struct PortListView: View {
     private var activeSummary: String {
         switch viewModel.activeCount {
         case 0: return "None active"
-        case 1: return "1 port active"
-        case let count: return "\(count) ports active"
+        case 1: return "1 of \(viewModel.watchedCount) active"
+        case let count: return "\(count) of \(viewModel.watchedCount) active"
         }
     }
 
     private var header: some View {
         HStack {
-            Text("Ports \(viewModel.rangeDescription)")
+            Text("Ports")
                 .font(.system(size: 12, weight: .semibold))
 
             Spacer()
@@ -51,16 +51,23 @@ struct PortListView: View {
         .padding(.vertical, 8)
     }
 
+    /// Shown only when the watch list itself is empty — a list of all-free ports still
+    /// renders as rows.
     private var emptyState: some View {
         HStack {
             Spacer()
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 Image(systemName: "powerplug")
                     .font(.system(size: 20))
                     .foregroundStyle(.tertiary)
-                Text("Nothing listening on \(viewModel.rangeDescription)")
+                Text("No ports being watched")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                Button("Add ports…") {
+                    openPreferences()
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 11))
             }
             Spacer()
         }
@@ -70,22 +77,22 @@ struct PortListView: View {
     private var portList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(Array(viewModel.ports.enumerated()), id: \.element.id) { index, port in
+                ForEach(Array(viewModel.rows.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Divider().padding(.leading, 12) }
 
                     PortRowView(
-                        port: port,
-                        isConfirmingKill: viewModel.pendingKill == port.id,
-                        onCommitLabel: { viewModel.setLabel($0, for: port) },
-                        onRequestKill: { viewModel.requestKill(port) },
-                        onConfirmKill: { viewModel.confirmKill(port) },
+                        row: row,
+                        isConfirmingKill: viewModel.pendingKill == row.id,
+                        onCommitLabel: { viewModel.setLabel($0, for: row) },
+                        onRequestKill: { viewModel.requestKill(row) },
+                        onConfirmKill: { viewModel.confirmKill(row) },
                         onCancelKill: { viewModel.cancelKill() }
                     )
                 }
             }
         }
-        // Cap the height so a wide range doesn't produce a popover taller than the screen.
-        .frame(maxHeight: 340)
+        // Cap the height so a long watch list doesn't produce a popover taller than the screen.
+        .frame(maxHeight: 360)
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -113,9 +120,7 @@ struct PortListView: View {
             .keyboardShortcut("r")
 
             Button {
-                openWindow(id: PortsApp.preferencesWindowID)
-                // LSUIElement apps aren't active, so the new window opens behind everything.
-                NSApp.activate(ignoringOtherApps: true)
+                openPreferences()
             } label: {
                 Label("Preferences", systemImage: "gearshape")
                     .font(.system(size: 11))
@@ -134,5 +139,11 @@ struct PortListView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    private func openPreferences() {
+        openWindow(id: PortsApp.preferencesWindowID)
+        // LSUIElement apps aren't active, so the new window opens behind everything.
+        NSApp.activate(ignoringOtherApps: true)
     }
 }

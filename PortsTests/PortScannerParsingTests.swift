@@ -88,7 +88,6 @@ struct PortScannerParsingTests {
         #expect(ports.map(\.port) == [3001, 3002, 3003, 3004, 3005, 3007])
         #expect(ports.map(\.pid) == [61619, 63934, 69464, 70374, 71798, 76336])
         #expect(ports.allSatisfy { $0.processName == "node" })
-        #expect(ports.allSatisfy { $0.label.isEmpty })
     }
 
     @Test("Carries pid and command forward across a process block's file descriptors")
@@ -210,33 +209,63 @@ struct PortScannerParsingTests {
 
     // MARK: - Command construction
 
-    @Test("Builds the expected lsof invocation and tolerates exit code 1")
+    @Test("Emits one -iTCP flag per watched port, sorted, and tolerates exit code 1")
     func buildsLsofInvocation() throws {
         let runner = StubCommandRunner(result: CommandResult(stdout: "", stderr: "", exitCode: 1))
-        let ports = try PortScanner.scan(range: 3000...3010, runner: runner)
+        let ports = try PortScanner.scan(ports: [8080, 3000, 5432], runner: runner)
 
         #expect(ports.isEmpty)
         #expect(runner.recordedExecutable == "/usr/sbin/lsof")
         #expect(runner.recordedArguments == [
-            "-nP", "-iTCP:3000-3010", "-sTCP:LISTEN", "-F", "pcn", "+c", "0",
+            "-nP",
+            "-iTCP:3000", "-iTCP:5432", "-iTCP:8080",
+            "-sTCP:LISTEN", "-F", "pcn", "+c", "0",
         ])
     }
 
-    @Test("Uses a bare port, not a range, when start equals end")
-    func buildsSinglePortInvocation() throws {
-        let runner = StubCommandRunner(result: CommandResult(stdout: "", stderr: "", exitCode: 1))
-        _ = try PortScanner.scan(range: 3000...3000, runner: runner)
+    /// The single most dangerous edge case: `lsof` with no `-i` flag lists every open file on
+    /// the system (~30k lines). An empty watch list must short-circuit before spawning.
+    @Test("Never runs lsof when the watch list is empty")
+    func doesNotRunLsofWithNoPorts() throws {
+        let runner = StubCommandRunner(result: CommandResult(stdout: "", stderr: "", exitCode: 0))
+        let ports = try PortScanner.scan(ports: [], runner: runner)
 
-        #expect(runner.recordedArguments.contains("-iTCP:3000"))
+        #expect(ports.isEmpty)
+        #expect(runner.callCount == 0)
     }
 
-    @Test("Throws on an lsof failure that isn't the empty-result case")
+    @Test("Never runs lsof when every requested port is out of bounds")
+    func doesNotRunLsofWithOnlyInvalidPorts() throws {
+        let runner = StubCommandRunner(result: CommandResult(stdout: "", stderr: "", exitCode: 0))
+        let ports = try PortScanner.scan(ports: [0, -1, 70000], runner: runner)
+
+        #expect(ports.isEmpty)
+        #expect(runner.callCount == 0)
+    }
+
+    @Test("Deduplicates repeated ports into a single flag")
+    func deduplicatesRequestedPorts() throws {
+        let runner = StubCommandRunner(result: CommandResult(stdout: "", stderr: "", exitCode: 1))
+        _ = try PortScanner.scan(ports: [3000, 3000, 3000], runner: runner)
+
+        #expect(runner.recordedArguments.filter { $0 == "-iTCP:3000" }.count == 1)
+    }
+
+    @Test("Drops out-of-bounds ports but still scans the valid ones")
+    func filtersInvalidPortsFromInvocation() throws {
+        let runner = StubCommandRunner(result: CommandResult(stdout: "", stderr: "", exitCode: 1))
+        _ = try PortScanner.scan(ports: [0, 3000, 70000], runner: runner)
+
+        #expect(runner.recordedArguments.filter { $0.hasPrefix("-iTCP:") } == ["-iTCP:3000"])
+    }
+
+    @Test("Throws on an lsof failure that isn't the nothing-matched case")
     func throwsOnRealFailure() {
         let runner = StubCommandRunner(
             result: CommandResult(stdout: "", stderr: "lsof: bad host", exitCode: 127)
         )
         #expect(throws: PortScannerError.self) {
-            try PortScanner.scan(range: 3000...3010, runner: runner)
+            try PortScanner.scan(ports: [3000], runner: runner)
         }
     }
 
@@ -245,10 +274,45 @@ struct PortScannerParsingTests {
         let runner = StubCommandRunner(
             result: CommandResult(stdout: Self.devServers, stderr: "", exitCode: 0)
         )
-        let ports = try PortScanner.scan(range: 3000...3010, runner: runner)
+        let ports = try PortScanner.scan(
+            ports: [3001, 3002, 3003, 3004, 3005, 3007], runner: runner
+        )
 
         #expect(ports.count == 6)
         #expect(ports.first?.port == 3001)
+    }
+
+    /// Real behavior confirmed against lsof 4.91: exit 1 means "at least one search term
+    /// matched nothing", which with one -i per port happens whenever any port is idle —
+    /// even though the other ports returned data that must still be parsed.
+    @Test("Parses results that accompany exit code 1")
+    func parsesResultsDespiteExitCodeOne() throws {
+        let runner = StubCommandRunner(
+            result: CommandResult(stdout: Self.devServers, stderr: "", exitCode: 1)
+        )
+        let ports = try PortScanner.scan(ports: [3001, 3002, 9999], runner: runner)
+
+        #expect(ports.map(\.port) == [3001, 3002])
+    }
+
+    @Test("Only returns ports that were actually asked for")
+    func filtersToRequestedPorts() throws {
+        let runner = StubCommandRunner(
+            result: CommandResult(stdout: Self.devServers, stderr: "", exitCode: 0)
+        )
+        let ports = try PortScanner.scan(ports: [3003, 3007], runner: runner)
+
+        #expect(ports.map(\.port) == [3003, 3007])
+    }
+
+    @Test("Handles a non-contiguous watch list")
+    func handlesNonContiguousPorts() {
+        let ports = PortScanner.parse(
+            fieldOutput: Self.systemServices, allowedPorts: [5000, 5037, 65289]
+        )
+
+        #expect(ports.map(\.port) == [5000, 5037, 65289])
+        #expect(ports.map(\.processName) == ["ControlCenter", "adb", "Code Helper (Plugin)"])
     }
 }
 
@@ -258,12 +322,14 @@ private final class StubCommandRunner: CommandRunner, @unchecked Sendable {
     private let result: CommandResult
     private(set) var recordedExecutable = ""
     private(set) var recordedArguments: [String] = []
+    private(set) var callCount = 0
 
     init(result: CommandResult) {
         self.result = result
     }
 
     func run(_ executable: String, _ arguments: [String]) throws -> CommandResult {
+        callCount += 1
         recordedExecutable = executable
         recordedArguments = arguments
         return result

@@ -3,12 +3,13 @@ import Foundation
 
 @MainActor
 final class PortsViewModel: ObservableObject {
-    @Published private(set) var ports: [ListeningPort] = []
+    /// One row per watched port, active or not.
+    @Published private(set) var rows: [PortRow] = []
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastScanDate: Date?
 
     /// The row currently awaiting kill confirmation, if any.
-    @Published var pendingKill: ListeningPort.ID?
+    @Published var pendingKill: PortRow.ID?
 
     let preferences: Preferences
 
@@ -39,7 +40,7 @@ final class PortsViewModel: ObservableObject {
         guard !hasStarted else { return }
         hasStarted = true
 
-        // Restart the loop when the range or interval changes. objectWillChange fires
+        // Restart the loop when the watch list or interval changes. objectWillChange fires
         // *before* the new value lands, so debounce past the edit before re-reading.
         preferences.objectWillChange
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
@@ -65,20 +66,18 @@ final class PortsViewModel: ObservableObject {
     // MARK: - Scanning
 
     func refresh() async {
-        let range = preferences.portRange
+        let watched = preferences.watchedPorts
         let runner = self.runner
         let store = self.labelStore
 
         // lsof is a blocking spawn — keep it off the main actor so the menu stays responsive.
-        let outcome = await Task.detached(priority: .utility) { () -> Result<[ListeningPort], Error> in
+        let outcome = await Task.detached(priority: .utility) { () -> Result<[PortRow], Error> in
             do {
-                let scanned = try PortScanner.scan(range: range, runner: runner)
+                let listeners = try PortScanner.scan(ports: watched, runner: runner)
                 let labels = store.load()
-                return .success(scanned.map { port in
-                    var labeled = port
-                    labeled.label = labels[port.port] ?? ""
-                    return labeled
-                })
+                return .success(
+                    PortRow.rows(watching: watched, listeners: listeners, labels: labels)
+                )
             } catch {
                 return .failure(error)
             }
@@ -88,12 +87,13 @@ final class PortsViewModel: ObservableObject {
 
         switch outcome {
         case let .success(scanned):
-            ports = scanned
+            rows = scanned
             errorMessage = nil
             lastScanDate = Date()
 
-            // Drop a stale confirmation if that row vanished between refreshes.
-            if let pending = pendingKill, !scanned.contains(where: { $0.id == pending }) {
+            // Drop a stale confirmation if that port went away or freed itself.
+            if let pending = pendingKill,
+               !scanned.contains(where: { $0.id == pending && $0.isActive }) {
                 pendingKill = nil
             }
         case let .failure(error):
@@ -105,16 +105,30 @@ final class PortsViewModel: ObservableObject {
         Task { await refresh() }
     }
 
+    // MARK: - Watch list
+
+    func addPort(_ port: Int) -> Bool {
+        let added = preferences.addPort(port)
+        if added { refreshNow() }
+        return added
+    }
+
+    func removePort(_ port: Int) {
+        preferences.removePort(port)
+        if pendingKill == port { pendingKill = nil }
+        refreshNow()
+    }
+
     // MARK: - Labels
 
-    func setLabel(_ label: String, for port: ListeningPort) {
+    func setLabel(_ label: String, for row: PortRow) {
         let cleaned = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard cleaned != port.label else { return }
+        guard cleaned != row.label else { return }
 
         do {
-            try labelStore.setLabel(cleaned, for: port.port)
-            if let index = ports.firstIndex(where: { $0.id == port.id }) {
-                ports[index].label = cleaned
+            try labelStore.setLabel(cleaned, for: row.port)
+            if let index = rows.firstIndex(where: { $0.id == row.id }) {
+                rows[index].label = cleaned
             }
             errorMessage = nil
         } catch {
@@ -124,21 +138,26 @@ final class PortsViewModel: ObservableObject {
 
     // MARK: - Killing
 
-    func requestKill(_ port: ListeningPort) {
-        pendingKill = port.id
+    func requestKill(_ row: PortRow) {
+        guard row.isActive else { return }
+        pendingKill = row.id
     }
 
     func cancelKill() {
         pendingKill = nil
     }
 
-    func confirmKill(_ port: ListeningPort) {
+    func confirmKill(_ row: PortRow) {
         pendingKill = nil
+        guard let pid = row.pid else { return }
+
         do {
-            try ProcessKiller.kill(pid: port.pid)
-            // The port is gone, so its label has nothing left to describe.
-            try? labelStore.removeLabel(for: port.port)
-            ports.removeAll { $0.id == port.id }
+            try ProcessKiller.kill(pid: pid)
+            // Per the ports.sh compatibility contract, a killed port's label line is removed.
+            try? labelStore.removeLabel(for: row.port)
+            if let index = rows.firstIndex(where: { $0.id == row.id }) {
+                rows[index] = PortRow(port: row.port, listener: nil, label: "")
+            }
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -148,12 +167,8 @@ final class PortsViewModel: ObservableObject {
 
     // MARK: - Derived state
 
-    var activeCount: Int { ports.count }
+    /// Drives the menu bar badge: how many watched ports are actually in use.
+    var activeCount: Int { rows.filter(\.isActive).count }
 
-    var rangeDescription: String {
-        let range = preferences.portRange
-        return range.lowerBound == range.upperBound
-            ? "\(range.lowerBound)"
-            : "\(range.lowerBound)–\(range.upperBound)"
-    }
+    var watchedCount: Int { rows.count }
 }
