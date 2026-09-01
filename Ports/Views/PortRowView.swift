@@ -38,7 +38,9 @@ struct PortRowView: View {
             processColumn
                 .frame(width: 110, alignment: .leading)
 
-            TextField("Label", text: $draftLabel)
+            // Passing a String (not a literal) selects the StringProtocol overload, so the
+            // detected project name renders verbatim rather than as a LocalizedStringKey.
+            TextField(row.labelPlaceholder, text: $draftLabel)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 11))
                 .focused($isLabelFocused)

@@ -10,16 +10,14 @@ sharing the same label file.
  🔌 3   ← menu bar: accent-tinted icon + count when ports are listening, dim when idle
 
 ┌───────────────────────────────────────────────────────┐
-│ Ports                              3 of 5 active      │
+│ Ports                                    3 active     │
 ├───────────────────────────────────────────────────────┤
-│ 3000   free          [ reserved     ]                 │
 │ 3001   node          [ storefront   ]        [Kill]   │
 │        PID 61619                                      │
-│ 3002   node          [ admin-api    ]        [Kill]   │
+│ 3002   node          [ admin-dashb… ]        [Kill]   │  <- grey: auto-detected
 │        PID 63934                                      │
 │ 5432   postgres      [ db           ]        [Kill]   │
 │        PID 9041                                       │
-│ 8080   free          [             ]                  │
 ├───────────────────────────────────────────────────────┤
 │ ↻ Refresh   ⚙ Preferences                      Quit   │
 └───────────────────────────────────────────────────────┘
@@ -31,11 +29,12 @@ sharing the same label file.
   your system accent color plus a count badge when ports are active.
 - **Watch individual ports**, not a range — `3000`, `5432`, `8080` and `6379` can all be
   watched together without dragging in everything in between.
-- **Every watched port gets a row**, in use or not. Idle ports show as `free` rather than
-  vanishing from the list, so you can see and label your whole set at a glance.
-- **Inline labels** — click the text field, type, press Enter or click away to save. Idle
-  ports can be labeled too.
-- **Kill** — SIGKILL with an inline two-step confirmation. Only offered on active ports.
+- **Only active ports are listed.** Idle watched ports are still scanned and still keep their
+  labels; they just don't clutter the dropdown.
+- **Auto-detected labels** — an unlabeled port shows its project name greyed out, taken from
+  the server process's working directory. Type over it to set a real label.
+- **Inline labels** — click the text field, type, press Enter or click away to save.
+- **Kill** — SIGKILL with an inline two-step confirmation.
 - **Auto-refresh** on a timer (default 3s), plus manual refresh (`⌘R`).
 - **Preferences** (`⌘,`) — add/remove watched ports, refresh interval, launch at login.
 
@@ -80,7 +79,7 @@ open /Applications/Ports.app
 xcodebuild test -project Ports.xcodeproj -scheme Ports
 ```
 
-68 tests across 4 suites covering the `lsof` parser, the row model, the settings store, and
+94 tests across 5 suites covering the `lsof` parsers, the row model, the settings store, and
 the label file format. None of them touch your real `~/.ports_labels.tsv` or app settings —
 the label tests use a temp directory and the settings tests use an isolated UserDefaults suite.
 
@@ -91,6 +90,9 @@ port to stop watching it.
 
 Ports are watched individually and don't have to be consecutive. A fresh install watches
 3000–3010 (as eleven individual entries), which you can prune or extend.
+
+The dropdown lists only the ports that are actually in use. Watching a port you rarely run is
+therefore cheap — it stays out of the list until something binds it.
 
 If you're upgrading from a version that stored a contiguous range, that range is migrated into
 the individual ports it covered, so nothing changes out from under you.
@@ -117,6 +119,19 @@ inconsistent about it. If the toggle throws an error:
 
 Any failure is shown inline in Preferences rather than silently flipping the toggle back.
 
+## Labels
+
+An unlabeled port shows a greyed-out guess: the basename of the server process's working
+directory, found with `lsof -a -p <pid> -d cwd`. A `vite dev` server started in
+`~/Work/streamline_mes_due_soon` shows as `streamline_mes_due_soon`.
+
+This is a placeholder only. It is **never** written to `~/.ports_labels.tsv` — the file shared
+with `ports.sh` stays limited to labels you actually typed. Processes running from `/` or from
+your bare home directory get no guess, since neither says anything useful.
+
+Lookups are cached per PID and pruned to live processes, so the extra `lsof` call doesn't run
+on every refresh tick.
+
 ## Label file (`~/.ports_labels.tsv`)
 
 Labels live in `~/.ports_labels.tsv`, tab-separated, one line per labeled port:
@@ -139,10 +154,9 @@ This is the same file `ports.sh` uses, and both tools can be used interchangeabl
 
 Edit the file by hand and the app picks it up on the next refresh.
 
-> **Note:** killing a port deletes its label line, per the original `ports.sh` contract. Now
-> that idle ports stay visible, you may prefer labels to survive a kill so a restarted server
-> keeps its name. That's a one-line change — drop the `removeLabel` call in
-> `PortsViewModel.confirmKill`.
+> **Note:** killing a port deletes its label line, per the original `ports.sh` contract. You may
+> prefer labels to survive a kill so a restarted server keeps its name. That's a one-line
+> change — drop the `removeLabel` call in `PortsViewModel.confirmKill`.
 
 ## How ports are discovered
 
@@ -184,6 +198,7 @@ Ports/
     ListeningPort.swift   a socket found in LISTEN state
     PortRow.swift         a watched port + its listener (if any) + label
     PortScanner.swift     lsof invocation + parsing
+    ProcessDirectory.swift  cwd -> project name, for auto-detected labels
     LabelStore.swift      ~/.ports_labels.tsv read/write
     ProcessKiller.swift
     LoginItem.swift       SMAppService wrapper
@@ -197,6 +212,7 @@ PortsTests/
   PortScannerParsingTests.swift
   PortRowTests.swift
   PreferencesTests.swift
+  ProcessDirectoryTests.swift
   LabelStoreTests.swift
 ```
 

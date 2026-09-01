@@ -168,4 +168,61 @@ struct PortRowTests {
     func idleRowHasNoPIDText() {
         #expect(PortRow(port: 3000).pidText == nil)
     }
+
+    // MARK: - Auto-detected labels
+
+    @Test("An active port picks up the detected project name for its PID")
+    func attachesAutoLabelByPID() {
+        let rows = PortRow.rows(
+            watching: [3000],
+            listeners: [listener(3000, 55582)],
+            labels: [:],
+            autoLabels: [55582: "streamline_mes_due_soon"]
+        )
+
+        #expect(rows[0].autoLabel == "streamline_mes_due_soon")
+        #expect(rows[0].labelPlaceholder == "streamline_mes_due_soon")
+    }
+
+    @Test("An idle port has no auto-label — there's no process to detect from")
+    func idlePortHasNoAutoLabel() {
+        let rows = PortRow.rows(
+            watching: [3000], listeners: [], labels: [:], autoLabels: [55582: "shop"]
+        )
+
+        #expect(rows[0].autoLabel == nil)
+        #expect(rows[0].labelPlaceholder == "Label")
+    }
+
+    @Test("A detected name for an unrelated PID isn't applied")
+    func ignoresAutoLabelForOtherPIDs() {
+        let rows = PortRow.rows(
+            watching: [3000],
+            listeners: [listener(3000, 111)],
+            labels: [:],
+            autoLabels: [999: "other-project"]
+        )
+
+        #expect(rows[0].autoLabel == nil)
+    }
+
+    /// The typed label is the real value; the detected name only fills the empty field.
+    @Test("A manual label coexists with the detected name and wins for display")
+    func manualLabelWinsOverAutoLabel() {
+        let rows = PortRow.rows(
+            watching: [3000],
+            listeners: [listener(3000, 55582)],
+            labels: [3000: "storefront"],
+            autoLabels: [55582: "streamline_mes_due_soon"]
+        )
+
+        #expect(rows[0].label == "storefront")
+        #expect(rows[0].autoLabel == "streamline_mes_due_soon")
+    }
+
+    @Test("Falls back to a generic placeholder with nothing detected")
+    func genericPlaceholderWithoutDetection() {
+        let rows = PortRow.rows(watching: [3000], listeners: [listener(3000, 1)], labels: [:])
+        #expect(rows[0].labelPlaceholder == "Label")
+    }
 }

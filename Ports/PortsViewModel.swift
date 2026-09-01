@@ -19,6 +19,11 @@ final class PortsViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private var hasStarted = false
 
+    /// Project name per PID, so the cwd lookup doesn't re-run every refresh tick. An empty
+    /// string records "looked up, nothing usable" so those PIDs aren't retried either.
+    /// Pruned to live PIDs on each scan so it can't grow without bound.
+    private var projectNames: [pid_t: String] = [:]
+
     init(
         preferences: Preferences = .shared,
         labelStore: LabelStore = LabelStore(),
@@ -69,15 +74,41 @@ final class PortsViewModel: ObservableObject {
         let watched = preferences.watchedPorts
         let runner = self.runner
         let store = self.labelStore
+        let knownNames = projectNames
 
         // lsof is a blocking spawn — keep it off the main actor so the menu stays responsive.
-        let outcome = await Task.detached(priority: .utility) { () -> Result<[PortRow], Error> in
+        let outcome = await Task.detached(priority: .utility) {
+            () -> Result<(rows: [PortRow], names: [pid_t: String]), Error> in
             do {
                 let listeners = try PortScanner.scan(ports: watched, runner: runner)
                 let labels = store.load()
-                return .success(
-                    PortRow.rows(watching: watched, listeners: listeners, labels: labels)
-                )
+
+                // Resolve working directories only for PIDs we haven't seen before, then
+                // keep just the live ones so the cache stays bounded.
+                let livePIDs = listeners.map(\.pid)
+                let unknown = livePIDs.filter { knownNames[$0] == nil }
+
+                var names = knownNames
+                if !unknown.isEmpty {
+                    let resolved = (try? ProcessDirectory.projectNames(
+                        for: unknown, runner: runner
+                    )) ?? [:]
+                    for pid in unknown {
+                        names[pid] = resolved[pid] ?? ""   // "" = looked up, nothing usable
+                    }
+                }
+                names = names.filter { livePIDs.contains($0.key) }
+
+                let autoLabels = names.compactMapValues { $0.isEmpty ? nil : $0 }
+                return .success((
+                    PortRow.rows(
+                        watching: watched,
+                        listeners: listeners,
+                        labels: labels,
+                        autoLabels: autoLabels
+                    ),
+                    names
+                ))
             } catch {
                 return .failure(error)
             }
@@ -86,7 +117,9 @@ final class PortsViewModel: ObservableObject {
         guard !Task.isCancelled else { return }
 
         switch outcome {
-        case let .success(scanned):
+        case let .success(result):
+            let scanned = result.rows
+            projectNames = result.names
             rows = scanned
             errorMessage = nil
             lastScanDate = Date()
@@ -167,8 +200,12 @@ final class PortsViewModel: ObservableObject {
 
     // MARK: - Derived state
 
+    /// What the dropdown lists. Idle ports are still scanned and still hold their labels,
+    /// they're just not shown — the list is about what's currently running.
+    var visibleRows: [PortRow] { rows.filter(\.isActive) }
+
     /// Drives the menu bar badge: how many watched ports are actually in use.
-    var activeCount: Int { rows.filter(\.isActive).count }
+    var activeCount: Int { visibleRows.count }
 
     var watchedCount: Int { rows.count }
 }

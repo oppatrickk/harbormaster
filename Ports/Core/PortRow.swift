@@ -10,6 +10,9 @@ struct PortRow: Identifiable, Hashable, Sendable {
     /// nil when nothing is listening — the port is free.
     let listener: ListeningPort?
     var label: String
+    /// Guessed from the process's working directory. Shown as a placeholder only; never
+    /// written to `~/.ports_labels.tsv`.
+    let autoLabel: String?
 
     var id: Int { port }
     var isActive: Bool { listener != nil }
@@ -27,11 +30,20 @@ struct PortRow: Identifiable, Hashable, Sendable {
 
     var pidText: String? { pid.map { "PID " + String($0) } }
 
-    init(port: Int, listener: ListeningPort? = nil, label: String = "") {
+    init(
+        port: Int,
+        listener: ListeningPort? = nil,
+        label: String = "",
+        autoLabel: String? = nil
+    ) {
         self.port = port
         self.listener = listener
         self.label = label
+        self.autoLabel = autoLabel
     }
+
+    /// What the label field shows when empty: the detected project name if we have one.
+    var labelPlaceholder: String { autoLabel ?? "Label" }
 
     /// Builds one row per watched port, attaching any listener found for it.
     ///
@@ -40,7 +52,8 @@ struct PortRow: Identifiable, Hashable, Sendable {
     static func rows(
         watching ports: [Int],
         listeners: [ListeningPort],
-        labels: [Int: String]
+        labels: [Int: String],
+        autoLabels: [pid_t: String] = [:]
     ) -> [PortRow] {
         var byPort: [Int: ListeningPort] = [:]
         for listener in listeners where byPort[listener.port] == nil {
@@ -48,7 +61,13 @@ struct PortRow: Identifiable, Hashable, Sendable {
         }
 
         return ports.sorted().map { port in
-            PortRow(port: port, listener: byPort[port], label: labels[port] ?? "")
+            let listener = byPort[port]
+            return PortRow(
+                port: port,
+                listener: listener,
+                label: labels[port] ?? "",
+                autoLabel: listener.flatMap { autoLabels[$0.pid] }
+            )
         }
     }
 }

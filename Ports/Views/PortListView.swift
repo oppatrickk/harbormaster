@@ -22,7 +22,7 @@ struct PortListView: View {
             header
             Divider()
 
-            if viewModel.rows.isEmpty {
+            if viewModel.visibleRows.isEmpty {
                 emptyState
             } else {
                 portList
@@ -44,8 +44,8 @@ struct PortListView: View {
     private var activeSummary: String {
         switch viewModel.activeCount {
         case 0: return "None active"
-        case 1: return "1 of \(viewModel.watchedCount) active"
-        case let count: return "\(count) of \(viewModel.watchedCount) active"
+        case 1: return "1 active"
+        case let count: return "\(count) active"
         }
     }
 
@@ -64,8 +64,6 @@ struct PortListView: View {
         .padding(.vertical, 8)
     }
 
-    /// Shown only when the watch list itself is empty — a list of all-free ports still
-    /// renders as rows.
     private var emptyState: some View {
         HStack {
             Spacer()
@@ -73,14 +71,22 @@ struct PortListView: View {
                 Image(systemName: "powerplug")
                     .font(.system(size: 20))
                     .foregroundStyle(.tertiary)
-                Text("No ports being watched")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Button("Add ports…") {
-                    openPreferences()
+
+                // "Nothing running" and "nothing configured" need different fixes, so they
+                // shouldn't read the same.
+                if viewModel.watchedCount == 0 {
+                    Text("No ports being watched")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Button("Add ports…") { openPreferences() }
+                        .buttonStyle(.link)
+                        .font(.system(size: 11))
+                } else {
+                    Text(verbatim: "Nothing listening on your \(viewModel.watchedCount) "
+                         + "watched port\(viewModel.watchedCount == 1 ? "" : "s")")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
             }
             Spacer()
         }
@@ -93,7 +99,7 @@ struct PortListView: View {
             // are already visible, so it reports zero height to the measurement below and
             // the list can never size itself out of being empty.
             VStack(spacing: 0) {
-                ForEach(Array(viewModel.rows.enumerated()), id: \.element.id) { index, row in
+                ForEach(Array(viewModel.visibleRows.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Divider().padding(.leading, 12) }
 
                     PortRowView(

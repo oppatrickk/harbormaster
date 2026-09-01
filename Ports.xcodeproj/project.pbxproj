@@ -24,6 +24,8 @@
 		AA000000000000000000020F /* PortRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010F /* PortRow.swift */; };
 		AA0000000000000000000210 /* PortRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000110 /* PortRowTests.swift */; };
 		AA0000000000000000000211 /* PreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000111 /* PreferencesTests.swift */; };
+		AA0000000000000000000212 /* ProcessDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000112 /* ProcessDirectory.swift */; };
+		AA0000000000000000000213 /* ProcessDirectoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000113 /* ProcessDirectoryTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +58,8 @@
 		AA000000000000000000010F /* PortRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortRow.swift; sourceTree = "<group>"; };
 		AA0000000000000000000110 /* PortRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortRowTests.swift; sourceTree = "<group>"; };
 		AA0000000000000000000111 /* PreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesTests.swift; sourceTree = "<group>"; };
+		AA0000000000000000000112 /* ProcessDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDirectory.swift; sourceTree = "<group>"; };
+		AA0000000000000000000113 /* ProcessDirectoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDirectoryTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +115,7 @@
 				AA0000000000000000000103 /* ListeningPort.swift */,
 				AA000000000000000000010F /* PortRow.swift */,
 				AA0000000000000000000104 /* PortScanner.swift */,
+				AA0000000000000000000112 /* ProcessDirectory.swift */,
 				AA0000000000000000000105 /* LabelStore.swift */,
 				AA0000000000000000000106 /* ProcessKiller.swift */,
 				AA0000000000000000000107 /* LoginItem.swift */,
@@ -137,6 +142,7 @@
 				AA000000000000000000010E /* LabelStoreTests.swift */,
 				AA0000000000000000000110 /* PortRowTests.swift */,
 				AA0000000000000000000111 /* PreferencesTests.swift */,
+				AA0000000000000000000113 /* ProcessDirectoryTests.swift */,
 			);
 			path = PortsTests;
 			sourceTree = "<group>";
@@ -242,6 +248,7 @@
 				AA0000000000000000000203 /* ListeningPort.swift in Sources */,
 				AA000000000000000000020F /* PortRow.swift in Sources */,
 				AA0000000000000000000204 /* PortScanner.swift in Sources */,
+				AA0000000000000000000212 /* ProcessDirectory.swift in Sources */,
 				AA0000000000000000000205 /* LabelStore.swift in Sources */,
 				AA0000000000000000000206 /* ProcessKiller.swift in Sources */,
 				AA0000000000000000000207 /* LoginItem.swift in Sources */,
@@ -263,6 +270,7 @@
 				AA000000000000000000020E /* LabelStoreTests.swift in Sources */,
 				AA0000000000000000000210 /* PortRowTests.swift in Sources */,
 				AA0000000000000000000211 /* PreferencesTests.swift in Sources */,
+				AA0000000000000000000213 /* ProcessDirectoryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
