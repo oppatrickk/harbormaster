@@ -302,6 +302,13 @@ The menu bar status item is unrelated to this — it's an SF Symbol template ima
 
 ## Notes and non-goals
 
-- Not sandboxed, not built for App Store distribution — this is a local dev tool.
+- Not sandboxed, and **can't be** — the Mac App Store requires the App Sandbox, which blocks
+  spawning `lsof`, signalling processes the app doesn't own, and writing `~/.ports_labels.tsv`.
+  Those three things are the entire app, so this is a Developer ID / build-it-yourself tool by
+  necessity rather than by preference.
 - No privilege elevation. You can only kill processes you own; anything else reports `EPERM`.
 - `lsof` shows ports owned by other users, but killing them will fail by design.
+
+## License
+
+[MIT](LICENSE) — © 2026 John Patrick Prieto.

@@ -36,14 +36,42 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Every release leads with install steps. The quarantine flag is the first thing a
+          # downloader hits, and "Harbormaster is damaged" reads like a corrupt download
+          # rather than what it is — an unnotarized app. gh prepends this to the generated
+          # changelog rather than replacing it.
+          cat > release-notes.md <<'EOF'
+          ## Install
+
+          1. Download the `.zip` below and unzip it.
+          2. Drag `Harbormaster.app` to `/Applications`.
+          3. Remove the quarantine flag:
+
+          ```bash
+          xattr -dr com.apple.quarantine /Applications/Harbormaster.app
+          ```
+
+          **Step 3 is not optional.** These builds are ad-hoc signed but *not notarized* —
+          notarizing requires a paid Apple Developer account. Without it macOS refuses to
+          open the app, reporting that it "is damaged and can't be opened". That message is
+          about the missing notarization, not about the download. Building from source avoids
+          it entirely, since locally built apps are never quarantined.
+
+          Universal binary (Apple Silicon and Intel). Requires macOS 13 Ventura or later.
+          `/Applications` is required for launch-at-login to work reliably.
+
+          ---
+          EOF
+
           # workflow_dispatch has no tag, so fall back to a dev build people can still grab.
           TAG="${GITHUB_REF_NAME}"
           if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
             TAG="dev-$(date +%Y%m%d-%H%M%S)"
+            printf '\nUnreleased build from %s\n' "${GITHUB_SHA}" >> release-notes.md
             gh release create "$TAG" dist/*.zip \
-              --title "Harbormaster $TAG" --notes "Unreleased build from ${GITHUB_SHA}" \
+              --title "Harbormaster $TAG" --notes-file release-notes.md \
               --prerelease
           else
             gh release create "$TAG" dist/*.zip \
-              --title "Harbormaster ${TAG#v}" --generate-notes
+              --title "Harbormaster ${TAG#v}" --notes-file release-notes.md --generate-notes
           fi
