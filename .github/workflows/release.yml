@@ -1,0 +1,44 @@
+name: Release
+
+# Tagging is the publish action: push v1.1 and the built app shows up on the Releases page.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: macos-14
+    permissions:
+      # Needed by `gh release create` to upload the artifact.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -project Harbormaster.xcodeproj \
+            -scheme Harbormaster \
+            -destination 'platform=macOS'
+
+      - name: Build release zip
+        run: ./Scripts/build-release.sh
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # workflow_dispatch has no tag, so fall back to a dev build people can still grab.
+          TAG="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            TAG="dev-$(date +%Y%m%d-%H%M%S)"
+            gh release create "$TAG" dist/*.zip \
+              --title "Harbormaster $TAG" --notes "Unreleased build from ${GITHUB_SHA}" \
+              --prerelease
+          else
+            gh release create "$TAG" dist/*.zip \
+              --title "Harbormaster ${TAG#v}" --generate-notes
+          fi

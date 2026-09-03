@@ -4,6 +4,9 @@
 # Xcode
 build/
 DerivedData/
+
+# Release artifacts from Scripts/build-release.sh — published to GitHub Releases, not git
+dist/
 *.xcuserstate
 *.xcuserdatad/
 xcuserdata/

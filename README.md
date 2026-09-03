@@ -1,6 +1,12 @@
-# Harbormaster
+<p align="center">
+  <img src="docs/icon.png" alt="" width="128" height="128">
+</p>
 
-A macOS menu bar app for watching and killing the TCP ports your dev servers are sitting on.
+<h1 align="center">Harbormaster</h1>
+
+<p align="center">
+  A macOS menu bar app for watching and killing the TCP ports your dev servers are sitting on.
+</p>
 
 A harbormaster assigns berths and can order a vessel out. Same idea: see what's docked on your
 dev ports, and evict it.
@@ -9,22 +15,11 @@ Native Swift + SwiftUI (`MenuBarExtra`, macOS 13+). No Electron, no Tauri, no do
 main window. It replaces a `ports.sh` script + web UI, and stays compatible with the script by
 sharing the same label file.
 
-```
- 🔌 3   ← menu bar: filled plug + count when ports are listening, outline plug when idle
+![The Harbormaster dropdown: three node servers on ports 3001, 3003 and 3004, each with its
+PID, an editable label, and a Kill button.](docs/screenshot.png)
 
-┌───────────────────────────────────────────────────────┐
-│ Ports                                        3 active │
-├───────────────────────────────────────────────────────┤
-│ 3001   node          [ storefront   ]        [Kill]   │
-│        PID 61619                                      │
-│ 3002   node          [ admin-dashb… ]        [Kill]   │  <- grey: auto-detected
-│        PID 63934                                      │
-│ 5432   postgres      [ db           ]        [Kill]   │
-│        PID 9041                                       │
-├───────────────────────────────────────────────────────┤
-│ ↻ Refresh   ⚙ Preferences                      Quit   │
-└───────────────────────────────────────────────────────┘
-```
+The menu bar shows a filled plug plus a count while ports are listening, and an outline plug
+when everything is idle.
 
 ## Features
 
@@ -42,7 +37,36 @@ sharing the same label file.
 - **Auto-refresh** on a timer (default 3s), plus manual refresh (`⌘R`).
 - **Preferences** (`⌘,`) — add/remove watched ports, refresh interval, launch at login.
 
-## Requirements
+## Install
+
+### Download a build
+
+Grab the latest `Harbormaster-<version>.zip` from the
+[**Releases**](https://github.com/oppatrickk/harbormaster/releases) page, unzip it, and drag
+`Harbormaster.app` to `/Applications`. It's a universal binary — Apple Silicon and Intel.
+
+```bash
+# Or from the terminal, with the GitHub CLI:
+gh release download --repo oppatrickk/harbormaster --pattern '*.zip'
+unzip Harbormaster-*.zip -d /Applications/
+open /Applications/Harbormaster.app
+```
+
+`/Applications` is recommended and **required** for launch-at-login to work reliably.
+
+> **Gatekeeper:** these builds are ad-hoc signed but **not notarized**, because notarizing
+> requires a paid Apple Developer account. macOS will refuse to open a downloaded copy with
+> *"Harbormaster is damaged"* or *"cannot be opened because the developer cannot be verified."*
+> That message is about the missing notarization, not about the app. To get past it:
+>
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/Harbormaster.app
+> ```
+>
+> If you'd rather not do that, build from source below — locally built apps are never
+> quarantined.
+
+### Requirements
 
 - macOS 13 (Ventura) or later
 - Xcode 16 or later to build (Swift Testing is used for the unit tests)
@@ -76,6 +100,27 @@ xcodebuild build -project Harbormaster.xcodeproj -scheme Harbormaster -configura
 cp -R ./build/Build/Products/Release/Harbormaster.app /Applications/
 open /Applications/Harbormaster.app
 ```
+
+### Cut a release
+
+```bash
+./Scripts/build-release.sh
+```
+
+Builds Release, verifies the app icon actually made it into the bundle, and packages
+`dist/Harbormaster-<version>.zip` with `ditto` (not `zip`, which mangles bundle symlinks and
+breaks the signature). It prints the SHA-256 and the `gh release create` line to run next.
+
+Pushing a `v*` tag does the whole thing on CI instead — [`.github/workflows/release.yml`](.github/workflows/release.yml)
+runs the tests, builds the zip, and attaches it to a GitHub release:
+
+```bash
+# Bump MARKETING_VERSION in the project first, then:
+git tag v1.1 && git push origin v1.1
+```
+
+The version comes from `MARKETING_VERSION` in the Xcode project — the script reads it rather
+than keeping its own copy, so there's one place to bump.
 
 ### Run the tests
 
@@ -212,17 +257,47 @@ Harbormaster/
     PortListView.swift
     PortRowView.swift
     PreferencesView.swift
+  Assets.xcassets/
+    AppIcon.appiconset/   generated — see "App icon" below
 HarbormasterTests/
   PortScannerParsingTests.swift
   PortRowTests.swift
   PreferencesTests.swift
   ProcessDirectoryTests.swift
   LabelStoreTests.swift
+Scripts/
+  generate-icon.swift     draws the app icon at every required size
+  build-release.sh        Release build -> dist/Harbormaster-<version>.zip
 ```
 
 `Core/` has no SwiftUI/AppKit dependency. `PortScanner` takes a `CommandRunner`, `LabelStore`
 takes a file URL, and `Preferences` takes a `UserDefaults`, so all three are testable without
 spawning `lsof` or touching your home directory.
+
+## App icon
+
+A white anchor on a dusk-harbor gradient. It's **drawn in code**, not stored as source art:
+
+```bash
+swift Scripts/generate-icon.swift
+```
+
+That rewrites all ten PNGs in `Harbormaster/Assets.xcassets/AppIcon.appiconset/` (16pt through
+512pt, @1x and @2x) plus their `Contents.json`. Xcode compiles them into `Assets.car` and an
+`AppIcon.icns` at build time.
+
+Generating it means the icon is reviewable as a diff — adjust a coordinate or a gradient stop
+in the script, re-run, and every size is regenerated consistently. Two details worth knowing if
+you edit it:
+
+- The plate is a **superellipse**, sampled parametrically rather than drawn as a rounded rect.
+  macOS icon corners curve continuously into the straight edges; a circular-cornered rect meets
+  them at a tangent and reads as subtly wrong next to real macOS icons.
+- The art sits in an 824pt box inside the 1024pt canvas. That ~82% inset is the standard macOS
+  icon grid, and it's what keeps the icon optically the same size as its neighbours in Finder.
+
+The menu bar status item is unrelated to this — it's an SF Symbol template image, drawn in
+`MenuBarLabel.swift`, so macOS can tint it to match the menu bar.
 
 ## Notes and non-goals
 
