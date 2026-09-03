@@ -8,6 +8,13 @@ private struct ContentHeightKey: PreferenceKey {
     }
 }
 
+private extension ClosedRange where Bound == CGFloat {
+    /// `ClosedRange.clamped(to:)` clamps a range to a range; this clamps a value.
+    func clamped(_ value: Bound) -> Bound {
+        Swift.min(Swift.max(value, lowerBound), upperBound)
+    }
+}
+
 struct PortListView: View {
     @ObservedObject var viewModel: PortsViewModel
     @Environment(\.openWindow) private var openWindow
@@ -15,7 +22,24 @@ struct PortListView: View {
     /// Measured height of the row stack, used to size the ScrollView explicitly.
     @State private var contentHeight: CGFloat = 0
 
+    /// Widest process column any row asked for. Rows all render at this width so they stay
+    /// aligned, but the column no longer reserves room for a long name when every process
+    /// on the list is called "node".
+    @State private var processColumnWidth: CGFloat = 0
+
+    /// Which row's label field is being edited, or nil for none.
+    ///
+    /// Owned here rather than inside the row so that a click anywhere else in the popover —
+    /// or Escape, or Enter — can put it back to nil. A `MenuBarExtra` window won't drop first
+    /// responder on its own, so without an explicit way out the cursor stays in the field.
+    @FocusState private var focusedRow: PortRow.ID?
+
     private let maxListHeight: CGFloat = 360
+
+    /// Floor keeps a lone short name ("go") from collapsing the column into the label field;
+    /// ceiling keeps one `language_server_macos_arm` from eating the space this whole change
+    /// is meant to give back.
+    private let processColumnRange: ClosedRange<CGFloat> = 62...150
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -36,7 +60,13 @@ struct PortListView: View {
             Divider()
             footer
         }
-        .frame(width: 400)
+        // Wide enough that a typical project name fits the label field without truncating;
+        // anything longer is still readable via the row's hover tooltips.
+        .frame(width: 480)
+        // Clicking any dead space — header, padding, between rows — ends the edit. Buttons and
+        // text fields are hit first, so this only catches clicks nothing else wanted.
+        .contentShape(Rectangle())
+        .onTapGesture { focusedRow = nil }
     }
 
     // MARK: - Sections
@@ -104,11 +134,10 @@ struct PortListView: View {
 
                     PortRowView(
                         row: row,
-                        isConfirmingKill: viewModel.pendingKill == row.id,
+                        processColumnWidth: processColumnRange.clamped(processColumnWidth),
+                        focusedRow: $focusedRow,
                         onCommitLabel: { viewModel.setLabel($0, for: row) },
-                        onRequestKill: { viewModel.requestKill(row) },
-                        onConfirmKill: { viewModel.confirmKill(row) },
-                        onCancelKill: { viewModel.cancelKill() }
+                        onKill: { viewModel.kill(row) }
                     )
                 }
             }
@@ -119,6 +148,7 @@ struct PortListView: View {
             )
         }
         .onPreferenceChange(ContentHeightKey.self) { contentHeight = $0 }
+        .onPreferenceChange(ProcessColumnWidthKey.self) { processColumnWidth = $0 }
         // An explicit height is required, not just a cap. A MenuBarExtra window proposes an
         // unspecified height to its content, and a ScrollView given no definite height
         // collapses to zero — which renders the whole list invisible. Measure the rows and

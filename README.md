@@ -38,7 +38,7 @@ sharing the same label file.
 - **Auto-detected labels** — an unlabeled port shows its project name greyed out, taken from
   the server process's working directory. Type over it to set a real label.
 - **Inline labels** — click the text field, type, press Enter or click away to save.
-- **Kill** — SIGKILL with an inline two-step confirmation.
+- **Kill** — one click, no confirmation. The button turns red under the cursor.
 - **Auto-refresh** on a timer (default 3s), plus manual refresh (`⌘R`).
 - **Preferences** (`⌘,`) — add/remove watched ports, refresh interval, launch at login.
 
@@ -160,7 +160,7 @@ Edit the file by hand and the app picks it up on the next refresh.
 
 > **Note:** killing a port deletes its label line, per the original `ports.sh` contract. You may
 > prefer labels to survive a kill so a restarted server keeps its name. That's a one-line
-> change — drop the `removeLabel` call in `PortsViewModel.confirmKill`.
+> change — drop the `removeLabel` call in `PortsViewModel.kill`.
 
 ## How ports are discovered
 

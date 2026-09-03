@@ -8,9 +8,6 @@ final class PortsViewModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastScanDate: Date?
 
-    /// The row currently awaiting kill confirmation, if any.
-    @Published var pendingKill: PortRow.ID?
-
     let preferences: Preferences
 
     private let labelStore: LabelStore
@@ -123,12 +120,6 @@ final class PortsViewModel: ObservableObject {
             rows = scanned
             errorMessage = nil
             lastScanDate = Date()
-
-            // Drop a stale confirmation if that port went away or freed itself.
-            if let pending = pendingKill,
-               !scanned.contains(where: { $0.id == pending && $0.isActive }) {
-                pendingKill = nil
-            }
         case let .failure(error):
             errorMessage = error.localizedDescription
         }
@@ -148,7 +139,6 @@ final class PortsViewModel: ObservableObject {
 
     func removePort(_ port: Int) {
         preferences.removePort(port)
-        if pendingKill == port { pendingKill = nil }
         refreshNow()
     }
 
@@ -171,17 +161,9 @@ final class PortsViewModel: ObservableObject {
 
     // MARK: - Killing
 
-    func requestKill(_ row: PortRow) {
-        guard row.isActive else { return }
-        pendingKill = row.id
-    }
-
-    func cancelKill() {
-        pendingKill = nil
-    }
-
-    func confirmKill(_ row: PortRow) {
-        pendingKill = nil
+    /// Sends SIGKILL immediately — the button is the confirmation. Recovery is restarting the
+    /// dev server, so a second click to confirm bought little.
+    func kill(_ row: PortRow) {
         guard let pid = row.pid else { return }
 
         do {

@@ -1,32 +1,84 @@
 import SwiftUI
 
+private extension View {
+    /// `.help("")` still installs a tooltip rect, which pops an empty box on hover. Attach
+    /// the tooltip only when there is something to say.
+    @ViewBuilder
+    func helpIfPresent(_ text: String) -> some View {
+        if text.isEmpty { self } else { help(text) }
+    }
+}
+
+/// Carries each row's natural process-column width up to the list, which takes the maximum
+/// and hands one shared width back down. Rows stay aligned without a fixed column that's
+/// mostly padding when every process is called "node".
+struct ProcessColumnWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+/// Neutral chip at rest, solid red under the cursor, darker while pressed.
+///
+/// A plain `.bordered` button with a red tint only recolors the title, which is far too quiet
+/// for a control that SIGKILLs a process on a single click.
+private struct KillButtonStyle: ButtonStyle {
+    let isHovering: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(isHovering ? Color.white : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(fill(pressed: configuration.isPressed))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .animation(.easeOut(duration: 0.12), value: isHovering)
+    }
+
+    private func fill(pressed: Bool) -> Color {
+        if pressed { return Color.red.opacity(0.75) }
+        if isHovering { return .red }
+        return Color.secondary.opacity(0.18)
+    }
+}
+
 struct PortRowView: View {
     let row: PortRow
-    let isConfirmingKill: Bool
+    /// Shared across every row, measured by the list. See `ProcessColumnWidthKey`.
+    let processColumnWidth: CGFloat
     let onCommitLabel: (String) -> Void
-    let onRequestKill: () -> Void
-    let onConfirmKill: () -> Void
-    let onCancelKill: () -> Void
+    let onKill: () -> Void
+
+    /// Which row's label field holds focus, owned by the list.
+    ///
+    /// This deliberately isn't a private `@FocusState` on the row: nothing outside the text
+    /// field could then clear it, so once you clicked in there was no way back out.
+    @FocusState.Binding var focusedRow: PortRow.ID?
 
     @State private var draftLabel: String
-    @FocusState private var isLabelFocused: Bool
+    @State private var isHoveringKill = false
 
     init(
         row: PortRow,
-        isConfirmingKill: Bool,
+        processColumnWidth: CGFloat,
+        focusedRow: FocusState<PortRow.ID?>.Binding,
         onCommitLabel: @escaping (String) -> Void,
-        onRequestKill: @escaping () -> Void,
-        onConfirmKill: @escaping () -> Void,
-        onCancelKill: @escaping () -> Void
+        onKill: @escaping () -> Void
     ) {
         self.row = row
-        self.isConfirmingKill = isConfirmingKill
+        self.processColumnWidth = processColumnWidth
+        _focusedRow = focusedRow
         self.onCommitLabel = onCommitLabel
-        self.onRequestKill = onRequestKill
-        self.onConfirmKill = onConfirmKill
-        self.onCancelKill = onCancelKill
+        self.onKill = onKill
         _draftLabel = State(initialValue: row.label)
     }
+
+    private var isLabelFocused: Bool { focusedRow == row.id }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -36,28 +88,68 @@ struct PortRowView: View {
                 .frame(width: 44, alignment: .leading)
 
             processColumn
-                .frame(width: 110, alignment: .leading)
+                .frame(width: processColumnWidth, alignment: .leading)
+                .background(processWidthProbe)
 
             // Passing a String (not a literal) selects the StringProtocol overload, so the
             // detected project name renders verbatim rather than as a LocalizedStringKey.
             TextField(row.labelPlaceholder, text: $draftLabel)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 11))
-                .focused($isLabelFocused)
-                .onSubmit(commitLabel)
+                .focused($focusedRow, equals: row.id)
+                // Enter commits *and* gives up focus. Committing alone left the cursor
+                // parked in the field with no obvious way out.
+                .onSubmit {
+                    commitLabel()
+                    focusedRow = nil
+                }
+                // Escape abandons the edit, the standard macOS text-field behaviour.
+                .onExitCommand {
+                    draftLabel = row.label
+                    focusedRow = nil
+                }
                 .onChange(of: isLabelFocused) { focused in
                     // Commit on blur as well as on Enter.
                     if !focused { commitLabel() }
                 }
+                // A label longer than the field is clipped with no ellipsis to hint at it,
+                // so hovering is the only way to read the rest.
+                .helpIfPresent(labelTooltip)
 
+            // Only wide enough for one button now that the confirm step (Kill + cancel X) is
+            // gone; the reclaimed width goes to the label field.
             killControl
-                .frame(width: 74, alignment: .trailing)
+                .frame(width: 48, alignment: .trailing)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .onChange(of: row.label) { newValue in
             // Pick up out-of-band edits (ports.sh writing the TSV) without stomping typing.
             if !isLabelFocused { draftLabel = newValue }
+        }
+    }
+
+    /// A hidden, unconstrained copy of the process column that reports the width this row
+    /// *would* like. It sits in a `.background`, so it never influences the row's own layout,
+    /// and `.fixedSize()` makes it ignore the proposed width — otherwise it would just
+    /// measure the column we already forced it into.
+    @ViewBuilder
+    private var processWidthProbe: some View {
+        if let processName = row.processName, let pidText = row.pidText {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: processName).font(.system(size: 12))
+                Text(verbatim: pidText).font(.system(size: 10))
+            }
+            .fixedSize()
+            .hidden()
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: ProcessColumnWidthKey.self,
+                        value: proxy.size.width
+                    )
+                }
+            )
         }
     }
 
@@ -74,6 +166,8 @@ struct PortRowView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
+            // Long process names are middle-truncated; hovering shows the whole thing.
+            .help(processName + " — " + pidText)
         } else {
             Text("free")
                 .font(.system(size: 11))
@@ -86,27 +180,30 @@ struct PortRowView: View {
         if !row.isActive {
             // Nothing to kill on a free port; the space stays reserved so rows stay aligned.
             Color.clear.frame(height: 1)
-        } else if isConfirmingKill {
-            HStack(spacing: 4) {
-                Button("Kill", action: onConfirmKill)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                    .controlSize(.small)
-                    .help(row.pidText.map { "Send SIGKILL to \($0)" } ?? "Send SIGKILL")
-
-                Button(action: onCancelKill) {
-                    Image(systemName: "xmark")
-                }
-                .buttonStyle(.borderless)
-                .controlSize(.small)
-                .help("Cancel")
-            }
         } else {
-            Button("Kill", action: onRequestKill)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("Kill \(row.processName ?? "process") on port " + row.portText)
+            Button("Kill", action: onKill)
+                .buttonStyle(KillButtonStyle(isHovering: isHoveringKill))
+                .onHover { isHoveringKill = $0 }
+                // No confirm step, so the tooltip is the only warning that the click is final.
+                .help(killTooltip)
         }
+    }
+
+    private var killTooltip: String {
+        let target = row.pidText.map { "\(row.processName ?? "process") (\($0))" }
+            ?? row.processName
+            ?? "process"
+        return "SIGKILL \(target) on port \(row.portText) — no confirmation"
+    }
+
+    /// What hovering the label field reveals: the typed label, or the auto-detected project
+    /// name when the field is still empty. Empty when there is neither, so no blank tooltip
+    /// pops up on a bare row.
+    private var labelTooltip: String {
+        let typed = draftLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !typed.isEmpty { return typed }
+        guard let autoLabel = row.autoLabel else { return "" }
+        return autoLabel + " (auto-detected)"
     }
 
     private func commitLabel() {
