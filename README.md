@@ -33,6 +33,7 @@ when everything is idle.
 - **Auto-detected labels** — an unlabeled port shows its project name greyed out, taken from
   the server process's working directory. Type over it to set a real label.
 - **Inline labels** — click the text field, type, press Enter or click away to save.
+- **Open in browser** — the ↗ button opens `http://localhost:<port>` in your default browser.
 - **Kill** — one click, no confirmation. The button turns red under the cursor.
 - **Auto-refresh** on a timer (default 3s), plus manual refresh (`⌘R`).
 - **Preferences** (`⌘,`) — add/remove watched ports, refresh interval, launch at login.
@@ -128,7 +129,7 @@ than keeping its own copy, so there's one place to bump.
 xcodebuild test -project Harbormaster.xcodeproj -scheme Harbormaster
 ```
 
-94 tests across 5 suites covering the `lsof` parsers, the row model, the settings store, and
+96 tests across 5 suites covering the `lsof` parsers, the row model, the settings store, and
 the label file format. None of them touch your real `~/.ports_labels.tsv` or app settings —
 the label tests use a temp directory and the settings tests use an isolated UserDefaults suite.
 

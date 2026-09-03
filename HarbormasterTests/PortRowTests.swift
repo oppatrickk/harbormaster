@@ -169,6 +169,21 @@ struct PortRowTests {
         #expect(PortRow(port: 3000).pidText == nil)
     }
 
+    @Test("The browser URL points at localhost on the row's port")
+    func localURLUsesLocalhost() {
+        let row = PortRow(port: 3001, listener: listener(3001, 61619))
+
+        #expect(row.localURL?.absoluteString == "http://localhost:3001")
+    }
+
+    @Test("The browser URL is ungrouped for four- and five-digit ports")
+    func localURLIsUngrouped() {
+        // A grouped "3,000" would make the URL unopenable, so this guards the same hazard
+        // the display strings do.
+        #expect(PortRow(port: 3000).localURL?.absoluteString == "http://localhost:3000")
+        #expect(PortRow(port: 51234).localURL?.absoluteString == "http://localhost:51234")
+    }
+
     // MARK: - Auto-detected labels
 
     @Test("An active port picks up the detected project name for its PID")

@@ -19,18 +19,20 @@ struct ProcessColumnWidthKey: PreferenceKey {
     }
 }
 
-/// Neutral chip at rest, solid red under the cursor, darker while pressed.
+/// Neutral chip at rest, filled with `hoverFill` under the cursor, darker while pressed.
 ///
-/// A plain `.bordered` button with a red tint only recolors the title, which is far too quiet
-/// for a control that SIGKILLs a process on a single click.
-private struct KillButtonStyle: ButtonStyle {
+/// Both row actions use this. A plain `.bordered` button with a tint only recolors the title,
+/// which is far too quiet for Kill — a control that SIGKILLs a process on a single click.
+private struct RowActionButtonStyle: ButtonStyle {
     let isHovering: Bool
+    let hoverFill: Color
+    var horizontalPadding: CGFloat = 10
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(isHovering ? Color.white : Color.primary)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 3)
             .background(
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
@@ -41,8 +43,8 @@ private struct KillButtonStyle: ButtonStyle {
     }
 
     private func fill(pressed: Bool) -> Color {
-        if pressed { return Color.red.opacity(0.75) }
-        if isHovering { return .red }
+        if pressed { return hoverFill.opacity(0.75) }
+        if isHovering { return hoverFill }
         return Color.secondary.opacity(0.18)
     }
 }
@@ -60,8 +62,11 @@ struct PortRowView: View {
     /// field could then clear it, so once you clicked in there was no way back out.
     @FocusState.Binding var focusedRow: PortRow.ID?
 
+    @Environment(\.openURL) private var openURL
+
     @State private var draftLabel: String
     @State private var isHoveringKill = false
+    @State private var isHoveringOpen = false
 
     init(
         row: PortRow,
@@ -116,10 +121,11 @@ struct PortRowView: View {
                 // so hovering is the only way to read the rest.
                 .helpIfPresent(labelTooltip)
 
-            // Only wide enough for one button now that the confirm step (Kill + cancel X) is
-            // gone; the reclaimed width goes to the label field.
-            killControl
-                .frame(width: 48, alignment: .trailing)
+            HStack(spacing: 6) {
+                openControl
+                killControl
+            }
+            .frame(width: 82, alignment: .trailing)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -175,6 +181,37 @@ struct PortRowView: View {
         }
     }
 
+    /// Opens `http://localhost:<port>` in the default browser.
+    ///
+    /// Shown for every active row. Plenty of dev ports don't speak HTTP — a Postgres on 5432
+    /// will just produce a browser error — but the app can't tell what protocol is behind a
+    /// listening socket, and guessing from the port number would be wrong as often as right.
+    @ViewBuilder
+    private var openControl: some View {
+        if row.isActive, let url = row.localURL {
+            Button {
+                openURL(url)
+            } label: {
+                // The diagonal arrow is the conventional "opens externally" mark. A globe or
+                // a browser glyph would name a destination; this names the action.
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(
+                RowActionButtonStyle(
+                    isHovering: isHoveringOpen,
+                    hoverFill: .accentColor,
+                    horizontalPadding: 7
+                )
+            )
+            .onHover { isHoveringOpen = $0 }
+            .help("Open " + url.absoluteString)
+            .accessibilityLabel("Open port " + row.portText + " in browser")
+        } else {
+            Color.clear.frame(height: 1)
+        }
+    }
+
     @ViewBuilder
     private var killControl: some View {
         if !row.isActive {
@@ -182,7 +219,7 @@ struct PortRowView: View {
             Color.clear.frame(height: 1)
         } else {
             Button("Kill", action: onKill)
-                .buttonStyle(KillButtonStyle(isHovering: isHoveringKill))
+                .buttonStyle(RowActionButtonStyle(isHovering: isHoveringKill, hoverFill: .red))
                 .onHover { isHoveringKill = $0 }
                 // No confirm step, so the tooltip is the only warning that the click is final.
                 .help(killTooltip)

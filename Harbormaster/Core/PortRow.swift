@@ -30,6 +30,12 @@ struct PortRow: Identifiable, Hashable, Sendable {
 
     var pidText: String? { pid.map { "PID " + String($0) } }
 
+    /// Where a dev server on this port is usually reachable.
+    ///
+    /// Built from `portText` rather than interpolating `port` directly, for the same reason
+    /// the display strings are: no chance of a grouped "3,000" ending up in a URL.
+    var localURL: URL? { URL(string: "http://localhost:" + portText) }
+
     init(
         port: Int,
         listener: ListeningPort? = nil,
