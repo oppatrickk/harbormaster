@@ -43,19 +43,36 @@ jobs:
           cat > release-notes.md <<'EOF'
           ## Install
 
-          1. Download the `.zip` below and unzip it.
-          2. Drag `Harbormaster.app` to `/Applications`.
-          3. Remove the quarantine flag:
+          ### From the terminal — no Gatekeeper prompt
+
+          `gh` and `curl` don't set the quarantine attribute that triggers the warning below,
+          so this route just works:
 
           ```bash
-          xattr -dr com.apple.quarantine /Applications/Harbormaster.app
+          gh release download --repo oppatrickk/harbormaster --pattern '*.zip'
+          ditto -x -k Harbormaster-*.zip /Applications/
+          open /Applications/Harbormaster.app
           ```
 
-          **Step 3 is not optional.** These builds are ad-hoc signed but *not notarized* —
-          notarizing requires a paid Apple Developer account. Without it macOS refuses to
-          open the app, reporting that it "is damaged and can't be opened". That message is
-          about the missing notarization, not about the download. Building from source avoids
-          it entirely, since locally built apps are never quarantined.
+          ### From the browser
+
+          Download the `.zip` below, unzip it, and drag `Harbormaster.app` to `/Applications`.
+          macOS will refuse to open it, reporting that the app **"is damaged"**. Either:
+
+          - **System Settings** → Privacy & Security → scroll to Security. After you've tried
+            to open the app once, an **Open Anyway** button appears there. (It only shows up
+            after a blocked attempt.)
+          - **Or in Terminal:**
+
+            ```bash
+            xattr -dr com.apple.quarantine /Applications/Harbormaster.app
+            ```
+
+          **Why does that happen?** These builds are ad-hoc signed but *not notarized* —
+          notarizing requires a paid Apple Developer account. "Damaged" is just Gatekeeper's
+          generic wording for "failed the check"; the file is byte-identical to what CI built.
+          Building from source avoids it entirely, since locally built apps are never
+          quarantined.
 
           Universal binary (Apple Silicon and Intel). Requires macOS 13 Ventura or later.
           `/Applications` is required for launch-at-login to work reliably.

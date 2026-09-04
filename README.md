@@ -42,30 +42,36 @@ when everything is idle.
 
 ### Download a build
 
-Grab the latest `Harbormaster-<version>.zip` from the
-[**Releases**](https://github.com/oppatrickk/harbormaster/releases) page, unzip it, and drag
-`Harbormaster.app` to `/Applications`. It's a universal binary — Apple Silicon and Intel.
+It's a universal binary — Apple Silicon and Intel. `/Applications` is recommended, and
+**required** for launch-at-login to work reliably.
+
+**From the terminal** — the quarantine attribute that triggers the Gatekeeper warning is set
+by *browsers*, not by `gh` or `curl`, so this route has no extra steps:
 
 ```bash
-# Or from the terminal, with the GitHub CLI:
 gh release download --repo oppatrickk/harbormaster --pattern '*.zip'
-unzip Harbormaster-*.zip -d /Applications/
+# ditto, not unzip: it preserves the bundle's symlinks and signature.
+ditto -x -k Harbormaster-*.zip /Applications/
 open /Applications/Harbormaster.app
 ```
 
-`/Applications` is recommended and **required** for launch-at-login to work reliably.
+**From the browser** — grab the latest `Harbormaster-<version>.zip` from the
+[**Releases**](https://github.com/oppatrickk/harbormaster/releases) page, unzip it, and drag
+`Harbormaster.app` to `/Applications`. macOS will then refuse to open it, reporting that the
+app *"is damaged"*. Either:
 
-> **Gatekeeper:** these builds are ad-hoc signed but **not notarized**, because notarizing
-> requires a paid Apple Developer account. macOS will refuse to open a downloaded copy with
-> *"Harbormaster is damaged"* or *"cannot be opened because the developer cannot be verified."*
-> That message is about the missing notarization, not about the app. To get past it:
->
-> ```bash
-> xattr -dr com.apple.quarantine /Applications/Harbormaster.app
-> ```
->
-> If you'd rather not do that, build from source below — locally built apps are never
-> quarantined.
+- **System Settings** → Privacy & Security → scroll to Security, where an **Open Anyway**
+  button appears once you've tried to open the app and been blocked.
+- **Or in Terminal:**
+
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/Harbormaster.app
+  ```
+
+> **Why:** these builds are ad-hoc signed but **not notarized** — notarizing requires a paid
+> Apple Developer account. *"Damaged"* is Gatekeeper's generic wording for "failed the check",
+> not a claim about the file, which is byte-identical to what CI built. Building from source
+> avoids it entirely: locally built apps are never quarantined.
 
 ### Requirements
 
